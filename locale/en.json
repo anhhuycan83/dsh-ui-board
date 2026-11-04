@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "title": "UI Board",
+    "description": "Whiteboard and UI wireframe canvas with bi-directional AI collaboration."
+  },
+  "title": "UI Board",
+  "open": "Open UI Board",
+  "close": "Close UI Board"
+}

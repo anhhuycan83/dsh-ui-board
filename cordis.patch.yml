@@ -1,0 +1,4 @@
+# dsh-ui-board bundle patch
+- insert:
+    - id: dsh-ui-board
+      name: 'dsh-ui-board'
