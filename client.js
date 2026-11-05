@@ -326,6 +326,239 @@ window.__ModuleLoader__.load({
           border-right: 2px solid var(--dsw-alias-label-tertiary, #9ca3af);
           border-bottom: 2px solid var(--dsw-alias-label-tertiary, #9ca3af);
         }
+
+        /* Current Board Title In Header */
+        .uib-board-title-wrapper {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 2px 7px;
+          border-radius: var(--dsw-radius-sm, 5px);
+          background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover, #f3f4f6) 80%, transparent);
+          border: 1px dashed var(--dsw-alias-border-l3, #cbd5e1);
+          cursor: pointer;
+          transition: background 0.12s, border-color 0.12s;
+        }
+        .uib-board-title-wrapper:hover {
+          background: var(--dsw-alias-interactive-bg-hover, #e5e7eb);
+          border-color: var(--dsw-alias-state-business-primary, #2563eb);
+        }
+        .uib-board-title-text {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--dsw-alias-label-primary, #111827);
+          max-width: 170px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .uib-board-title-input {
+          font-family: inherit;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 2px 6px;
+          border-radius: 4px;
+          border: 1.5px solid var(--dsw-alias-state-business-primary, #2563eb);
+          background: var(--dsw-alias-bg-layer-1, #ffffff);
+          color: var(--dsw-alias-label-primary, #111827);
+          outline: none;
+          width: 150px;
+        }
+
+        /* Saved Boards Modal */
+        .uib-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          backdrop-filter: blur(2px);
+          z-index: 100000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          animation: uib-fade-in 0.15s ease-out;
+        }
+        .uib-modal-card {
+          width: 620px;
+          max-width: calc(100vw - 32px);
+          max-height: 85vh;
+          background: var(--dsw-alias-bg-layer-1, #ffffff);
+          color: var(--dsw-alias-label-primary, #111827);
+          border: 1px solid var(--dsw-alias-border-l2, #e5e7eb);
+          border-radius: 12px;
+          box-shadow: 0 20px 45px rgba(0, 0, 0, 0.22);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          font-family: inherit;
+        }
+        .uib-modal-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 18px;
+          background: var(--dsw-alias-bg-layer-2, #f9fafb);
+          border-bottom: 0.5px solid var(--dsw-alias-border-l2, #e5e7eb);
+        }
+        .uib-modal-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 15px;
+          font-weight: 600;
+        }
+        .uib-modal-body {
+          padding: 12px 18px 18px;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+          flex: 1;
+        }
+        .uib-search-bar {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 18px 0;
+        }
+        .uib-search-input {
+          flex: 1;
+          height: 32px;
+          padding: 0 10px;
+          border-radius: var(--dsw-radius-sm, 6px);
+          border: 1px solid var(--dsw-alias-border-l2, #d1d5db);
+          background: var(--dsw-alias-bg-layer-1, #ffffff);
+          color: var(--dsw-alias-label-primary, #111827);
+          font-size: 12px;
+          font-family: inherit;
+          outline: none;
+        }
+        .uib-search-input:focus {
+          border-color: var(--dsw-alias-state-business-primary, #2563eb);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary, #2563eb) 20%, transparent);
+        }
+        .uib-btn-primary {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          height: 28px;
+          padding: 0 10px;
+          font-size: 11px;
+          font-weight: 600;
+          border-radius: 6px;
+          border: none;
+          background: var(--dsw-alias-state-business-primary, #2563eb);
+          color: #ffffff;
+          cursor: pointer;
+          transition: opacity 0.12s;
+        }
+        .uib-btn-primary:hover {
+          opacity: 0.9;
+        }
+        .uib-btn-secondary {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          height: 28px;
+          padding: 0 10px;
+          font-size: 11px;
+          font-weight: 500;
+          border-radius: 6px;
+          border: 1px solid var(--dsw-alias-border-l2, #d1d5db);
+          background: var(--dsw-alias-bg-layer-1, #ffffff);
+          color: var(--dsw-alias-label-primary, #111827);
+          cursor: pointer;
+          transition: background 0.12s;
+        }
+        .uib-btn-secondary:hover {
+          background: var(--dsw-alias-interactive-bg-hover, #f3f4f6);
+        }
+        .uib-board-card {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 14px;
+          border-radius: 8px;
+          border: 1px solid var(--dsw-alias-border-l2, #e5e7eb);
+          background: var(--dsw-alias-bg-layer-1, #ffffff);
+          transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+          cursor: pointer;
+        }
+        .uib-board-card:hover {
+          border-color: var(--dsw-alias-state-business-primary, #2563eb);
+          background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #2563eb) 3%, #ffffff);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        .uib-board-card.active {
+          border-color: var(--dsw-alias-state-business-primary, #2563eb);
+          background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #2563eb) 6%, #ffffff);
+        }
+        .uib-board-card-info {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 0;
+          flex: 1;
+        }
+        .uib-board-card-title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .uib-board-card-name {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--dsw-alias-label-primary, #111827);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .uib-board-card-meta {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          color: var(--dsw-alias-label-tertiary, #6b7280);
+        }
+        .uib-active-pill {
+          padding: 1px 6px;
+          font-size: 10px;
+          font-weight: 600;
+          border-radius: 999px;
+          background: var(--dsw-alias-state-business-primary, #2563eb);
+          color: #ffffff;
+        }
+        .uib-board-card-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .uib-card-action-btn {
+          height: 26px;
+          padding: 0 8px;
+          font-size: 11px;
+          font-weight: 500;
+          border-radius: 4px;
+          border: 1px solid var(--dsw-alias-border-l2, #d1d5db);
+          background: var(--dsw-alias-bg-layer-1, #ffffff);
+          color: var(--dsw-alias-label-secondary, #4b5563);
+          cursor: pointer;
+          transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .uib-card-action-btn:hover {
+          background: var(--dsw-alias-interactive-bg-hover, #f3f4f6);
+          color: var(--dsw-alias-label-primary, #111827);
+        }
+        .uib-card-action-btn.danger:hover {
+          background: #fee2e2;
+          color: #dc2626;
+          border-color: #fca5a5;
+        }
+        .uib-empty-boards {
+          padding: 30px;
+          text-align: center;
+          font-size: 13px;
+          color: var(--dsw-alias-label-tertiary, #9ca3af);
+        }
       `;
       document.head.appendChild(style);
     }
@@ -368,6 +601,24 @@ window.__ModuleLoader__.load({
         h("line", { x1: 12.5, y1: 3.5, x2: 3.5, y2: 12.5 })
       ]);
     }
+    function SvgFolder() {
+      return h("svg", { width: 14, height: 14, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinejoin: "round" }, [
+        h("path", { d: "M1.5 3.5A1.5 1.5 0 0 1 3 2h3.5l1.5 2H13a1.5 1.5 0 0 1 1.5 1.5V13a1.5 1.5 0 0 1-1.5 1.5H3A1.5 1.5 0 0 1 1.5 13V3.5z" })
+      ]);
+    }
+    function SvgSave() {
+      return h("svg", { width: 14, height: 14, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinejoin: "round" }, [
+        h("path", { d: "M13.5 14H2.5A1.5 1.5 0 0 1 1 12.5V2.5A1.5 1.5 0 0 1 2.5 1h8.5l4 4v7.5a1.5 1.5 0 0 1-1.5 1.5z" }),
+        h("path", { d: "M4 1v4h6V1" }),
+        h("rect", { x: 4, y: 8, width: 8, height: 6, rx: 1 })
+      ]);
+    }
+    function SvgPlus() {
+      return h("svg", { width: 14, height: 14, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" }, [
+        h("line", { x1: 8, y1: 2.5, x2: 8, y2: 13.5 }),
+        h("line", { x1: 2.5, y1: 8, x2: 13.5, y2: 8 })
+      ]);
+    }
 
     /**
      * Whiteboard Modal Component
@@ -395,6 +646,34 @@ window.__ModuleLoader__.load({
       const [canvasSize, setCanvasSize] = useState({ width: 3400, height: 2400 });
       const [zoom, setZoom] = useState(1);
       const [isSpacePressed, setIsSpacePressed] = useState(false);
+
+      // Board Identification & Management
+      const [currentBoardId, setCurrentBoardId] = useState(() => {
+        try {
+          return localStorage.getItem(`dsh_ui_board_current_${activeSessionId}`) || activeSessionId;
+        } catch (_) {
+          return activeSessionId;
+        }
+      });
+
+      const [currentBoardName, setCurrentBoardName] = useState(() => {
+        try {
+          return localStorage.getItem(`dsh_ui_board_name_${currentBoardId}`) ||
+            (currentBoardId === "default" ? "Default Board" :
+            (currentBoardId.startsWith("session-") ? `Session Board` : "Untitled Board"));
+        } catch (_) {
+          return "Untitled Board";
+        }
+      });
+
+      const [isEditingBoardName, setIsEditingBoardName] = useState(false);
+      const [boardNameEdit, setBoardNameEdit] = useState("");
+
+      // Saved Boards manager modal
+      const [showBoardsModal, setShowBoardsModal] = useState(false);
+      const [savedBoards, setSavedBoards] = useState([]);
+      const [boardsSearch, setBoardsSearch] = useState("");
+      const boardImportInputRef = useRef(null);
 
       const isDraggingRef = useRef(false);
       const dragStartPosRef = useRef({ x: 0, y: 0 });
@@ -429,6 +708,62 @@ window.__ModuleLoader__.load({
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         toastTimerRef.current = setTimeout(() => setToastMsg(""), 3500);
       }, []);
+
+      const formatTimeAgo = (timestamp) => {
+        if (!timestamp) return "Recently";
+        const diff = Date.now() - timestamp;
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return "Just now";
+        if (mins < 60) return `${mins}m ago`;
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        if (days < 7) return `${days}d ago`;
+        return new Date(timestamp).toLocaleDateString();
+      };
+
+      // Refresh list of saved boards from server & localStorage
+      const refreshBoardsList = useCallback(async () => {
+        let localList = [];
+        try {
+          const raw = localStorage.getItem("dsh_ui_boards_index");
+          if (raw) localList = JSON.parse(raw) || [];
+        } catch (_) {}
+
+        let serverList = [];
+        try {
+          const res = await fetch("/api/ui-board?action=list");
+          const data = await res.json();
+          if (data?.ok && Array.isArray(data.boards)) {
+            serverList = data.boards;
+          }
+        } catch (_) {}
+
+        const map = new Map();
+        for (const item of localList) {
+          if (item?.id) map.set(item.id, item);
+        }
+        for (const item of serverList) {
+          if (item?.id) {
+            const existing = map.get(item.id);
+            if (!existing || (item.updatedAt || 0) >= (existing.updatedAt || 0)) {
+              map.set(item.id, { ...existing, ...item });
+            }
+          }
+        }
+
+        const merged = Array.from(map.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        setSavedBoards(merged);
+        try {
+          localStorage.setItem("dsh_ui_boards_index", JSON.stringify(merged));
+        } catch (_) {}
+      }, []);
+
+      useEffect(() => {
+        if (showBoardsModal) {
+          refreshBoardsList();
+        }
+      }, [showBoardsModal, refreshBoardsList]);
 
       // Blur any active element so Space doesn't trigger button clicks
       useEffect(() => {
@@ -475,7 +810,7 @@ window.__ModuleLoader__.load({
         window.addEventListener("mouseup", handleMouseUp);
       };
 
-      // Push state into undo history
+      // Push state into undo history and auto save
       const commitElements = useCallback((nextElements) => {
         setElements(nextElements);
         setHistory(prev => {
@@ -484,18 +819,307 @@ window.__ModuleLoader__.load({
         });
         setHistoryIndex(prev => prev + 1);
 
-        // Auto save to server and localStorage
-        const sid = activeSessionId;
+        const bid = currentBoardId;
+        const bname = currentBoardName;
         try {
-          localStorage.setItem(`dsh_ui_board_${sid}`, JSON.stringify(nextElements));
+          localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify(nextElements));
+          localStorage.setItem(`dsh_ui_board_name_${bid}`, bname);
+          let idxList = [];
+          try {
+            idxList = JSON.parse(localStorage.getItem("dsh_ui_boards_index") || "[]");
+          } catch (_) {}
+          const existIdx = idxList.findIndex(b => b.id === bid);
+          const boardMeta = {
+            id: bid,
+            name: bname,
+            sessionId: activeSessionId,
+            count: nextElements.length,
+            updatedAt: Date.now()
+          };
+          if (existIdx >= 0) {
+            idxList[existIdx] = { ...idxList[existIdx], ...boardMeta };
+          } else {
+            idxList.unshift(boardMeta);
+          }
+          localStorage.setItem("dsh_ui_boards_index", JSON.stringify(idxList));
         } catch (_) {}
 
-        fetch(`/api/ui-board?session=${encodeURIComponent(sid)}`, {
+        fetch("/api/ui-board", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session: sid, elements: nextElements })
+          body: JSON.stringify({
+            id: bid,
+            name: bname,
+            session: activeSessionId,
+            elements: nextElements
+          })
         }).catch(() => {});
-      }, [historyIndex, activeSessionId]);
+      }, [historyIndex, currentBoardId, currentBoardName, activeSessionId]);
+
+      // Explicit manual save
+      const handleManualSave = useCallback(() => {
+        const bid = currentBoardId;
+        const bname = currentBoardName;
+        try {
+          localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify(elements));
+          localStorage.setItem(`dsh_ui_board_name_${bid}`, bname);
+        } catch (_) {}
+
+        fetch("/api/ui-board", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: bid,
+            name: bname,
+            session: activeSessionId,
+            elements
+          })
+        }).then(() => {
+          refreshBoardsList();
+          showToast(`💾 Saved board "${bname}" successfully!`);
+        }).catch((err) => {
+          showToast(`⚠️ Save error: ${err.message}`);
+        });
+      }, [currentBoardId, currentBoardName, elements, activeSessionId, refreshBoardsList, showToast]);
+
+      // Rename current board
+      const handleSaveBoardName = () => {
+        setIsEditingBoardName(false);
+        const trimmed = (boardNameEdit || "").trim();
+        if (!trimmed || trimmed === currentBoardName) return;
+        setCurrentBoardName(trimmed);
+        try {
+          localStorage.setItem(`dsh_ui_board_name_${currentBoardId}`, trimmed);
+        } catch (_) {}
+        fetch("/api/ui-board", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: currentBoardId,
+            name: trimmed,
+            session: activeSessionId,
+            elements
+          })
+        }).then(() => {
+          refreshBoardsList();
+          showToast(`🏷️ Renamed board to "${trimmed}"`);
+        }).catch(() => {});
+      };
+
+      // Load an existing board
+      const handleLoadBoard = useCallback((boardId, boardName) => {
+        if (boardId === currentBoardId) {
+          setShowBoardsModal(false);
+          return;
+        }
+
+        // Commit current board state before switching
+        try {
+          localStorage.setItem(`dsh_ui_board_${currentBoardId}`, JSON.stringify(elements));
+          localStorage.setItem(`dsh_ui_board_name_${currentBoardId}`, currentBoardName);
+        } catch (_) {}
+
+        setCurrentBoardId(boardId);
+        const finalName = boardName || "Untitled Board";
+        setCurrentBoardName(finalName);
+        try {
+          localStorage.setItem(`dsh_ui_board_current_${activeSessionId}`, boardId);
+          localStorage.setItem(`dsh_ui_board_name_${boardId}`, finalName);
+        } catch (_) {}
+
+        // Check local cache for immediate display
+        try {
+          const cached = localStorage.getItem(`dsh_ui_board_${boardId}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+              setElements(parsed);
+              setHistory([parsed]);
+              setHistoryIndex(0);
+            }
+          }
+        } catch (_) {}
+
+        // Fetch from server
+        fetch(`/api/ui-board?id=${encodeURIComponent(boardId)}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data?.ok && Array.isArray(data.elements)) {
+              setElements(data.elements);
+              setHistory([data.elements]);
+              setHistoryIndex(0);
+              if (data.name) setCurrentBoardName(data.name);
+            }
+          })
+          .catch(() => {});
+
+        setShowBoardsModal(false);
+        showToast(`📂 Opened board "${finalName}"!`);
+      }, [currentBoardId, currentBoardName, elements, activeSessionId, showToast]);
+
+      // Create a brand new board
+      const handleCreateNewBoard = useCallback(() => {
+        const name = window.prompt("Enter new board name:", "Untitled Board");
+        if (name === null) return;
+        const trimmed = (name || "").trim() || "Untitled Board";
+
+        // Save current board first
+        try {
+          localStorage.setItem(`dsh_ui_board_${currentBoardId}`, JSON.stringify(elements));
+          localStorage.setItem(`dsh_ui_board_name_${currentBoardId}`, currentBoardName);
+        } catch (_) {}
+
+        const newId = `board_${Date.now()}`;
+        setCurrentBoardId(newId);
+        setCurrentBoardName(trimmed);
+        setElements([]);
+        setHistory([[]]);
+        setHistoryIndex(0);
+
+        try {
+          localStorage.setItem(`dsh_ui_board_${newId}`, JSON.stringify([]));
+          localStorage.setItem(`dsh_ui_board_name_${newId}`, trimmed);
+          localStorage.setItem(`dsh_ui_board_current_${activeSessionId}`, newId);
+        } catch (_) {}
+
+        fetch("/api/ui-board", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: newId,
+            name: trimmed,
+            session: activeSessionId,
+            elements: []
+          })
+        }).then(() => {
+          refreshBoardsList();
+        }).catch(() => {});
+
+        setShowBoardsModal(false);
+        showToast(`✨ Created new board "${trimmed}"!`);
+      }, [currentBoardId, currentBoardName, elements, activeSessionId, refreshBoardsList, showToast]);
+
+      // Delete a board
+      const handleDeleteBoard = useCallback((boardId, boardName, e) => {
+        if (e) e.stopPropagation();
+        if (!window.confirm(`Are you sure you want to delete board "${boardName || boardId}"?`)) {
+          return;
+        }
+
+        // Delete from server
+        fetch(`/api/ui-board?id=${encodeURIComponent(boardId)}`, {
+          method: "DELETE"
+        }).catch(() => {
+          fetch("/api/ui-board", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "delete", id: boardId })
+          }).catch(() => {});
+        });
+
+        // Delete from localStorage
+        try {
+          localStorage.removeItem(`dsh_ui_board_${boardId}`);
+          localStorage.removeItem(`dsh_ui_board_name_${boardId}`);
+          const raw = localStorage.getItem("dsh_ui_boards_index");
+          if (raw) {
+            const list = JSON.parse(raw);
+            const filtered = list.filter(b => b.id !== boardId);
+            localStorage.setItem("dsh_ui_boards_index", JSON.stringify(filtered));
+          }
+        } catch (_) {}
+
+        if (boardId === currentBoardId) {
+          const fallbackId = activeSessionId;
+          const fallbackName = "Untitled Board";
+          setCurrentBoardId(fallbackId);
+          setCurrentBoardName(fallbackName);
+          setElements([]);
+          setHistory([[]]);
+          setHistoryIndex(0);
+        }
+
+        refreshBoardsList();
+        showToast(`🗑️ Deleted board "${boardName || boardId}"`);
+      }, [currentBoardId, activeSessionId, refreshBoardsList, showToast]);
+
+      // Export board to JSON file
+      const handleExportBoardById = useCallback((boardId, boardName, e) => {
+        if (e) e.stopPropagation();
+        let boardElements = [];
+        if (boardId === currentBoardId) {
+          boardElements = elements;
+        } else {
+          try {
+            const cached = localStorage.getItem(`dsh_ui_board_${boardId}`);
+            if (cached) boardElements = JSON.parse(cached) || [];
+          } catch (_) {}
+        }
+
+        const data = {
+          id: boardId,
+          name: boardName || "ui-board",
+          elements: boardElements,
+          exportedAt: Date.now()
+        };
+        const jsonStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonStr], { type: "application/json" });
+        const URLObj = window.URL || window.webkitURL || window;
+        const blobUrl = URLObj.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `${(boardName || "ui-board").replace(/[^a-zA-Z0-9_-]/g, "_")}.uiboard.json`;
+        a.click();
+        URLObj.revokeObjectURL(blobUrl);
+        showToast(`💾 Exported "${boardName || 'board'}" to file!`);
+      }, [currentBoardId, elements, showToast]);
+
+      // Import board from JSON file
+      const handleImportBoardFile = useCallback((file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (!data || !Array.isArray(data.elements)) {
+              showToast("⚠️ Invalid file: missing elements array");
+              return;
+            }
+            const newId = `board_${Date.now()}`;
+            const newName = data.name || file.name.replace(/\.[^/.]+$/, "") || "Imported Board";
+            const newBoard = {
+              id: newId,
+              name: newName,
+              session: activeSessionId,
+              elements: data.elements
+            };
+
+            try {
+              localStorage.setItem(`dsh_ui_board_${newId}`, JSON.stringify(data.elements));
+              localStorage.setItem(`dsh_ui_board_name_${newId}`, newName);
+              localStorage.setItem(`dsh_ui_board_current_${activeSessionId}`, newId);
+            } catch (_) {}
+
+            fetch("/api/ui-board", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(newBoard)
+            }).then(() => {
+              setCurrentBoardId(newId);
+              setCurrentBoardName(newName);
+              setElements(data.elements);
+              setHistory([data.elements]);
+              setHistoryIndex(0);
+              refreshBoardsList();
+              setShowBoardsModal(false);
+              showToast(`📥 Imported "${newName}" with ${data.elements.length} elements!`);
+            });
+          } catch (err) {
+            showToast("⚠️ Could not parse JSON file: " + err.message);
+          }
+        };
+        reader.readAsText(file);
+      }, [activeSessionId, refreshBoardsList, showToast]);
 
       // Insert image file from drag-drop or paste
       const insertImageFile = useCallback((file, coords) => {
@@ -524,7 +1148,7 @@ window.__ModuleLoader__.load({
               width: w,
               height: h,
               src: dataUrl,
-              label: file.name || "Hình ảnh"
+              label: file.name || "Image"
             };
             setElements(prev => {
               const next = [...prev, newImage];
@@ -567,10 +1191,9 @@ window.__ModuleLoader__.load({
 
       // Load initial elements
       useEffect(() => {
-        const sid = activeSessionId;
-        // Check localStorage first for instant display
+        const bid = currentBoardId;
         try {
-          const cached = localStorage.getItem(`dsh_ui_board_${sid}`);
+          const cached = localStorage.getItem(`dsh_ui_board_${bid}`);
           if (cached) {
             const parsed = JSON.parse(cached);
             if (Array.isArray(parsed)) {
@@ -579,42 +1202,51 @@ window.__ModuleLoader__.load({
               setHistoryIndex(0);
             }
           }
+          const storedName = localStorage.getItem(`dsh_ui_board_name_${bid}`);
+          if (storedName) setCurrentBoardName(storedName);
         } catch (_) {}
 
-        // Fetch from server
-        fetch(`/api/ui-board?session=${encodeURIComponent(sid)}`)
+        fetch(`/api/ui-board?id=${encodeURIComponent(bid)}`)
           .then(res => res.json())
           .then(data => {
             if (data?.ok && Array.isArray(data.elements)) {
               setElements(data.elements);
               setHistory([data.elements]);
               setHistoryIndex(0);
+              if (data.name) {
+                setCurrentBoardName(data.name);
+                try {
+                  localStorage.setItem(`dsh_ui_board_name_${bid}`, data.name);
+                } catch (_) {}
+              }
             }
           })
           .catch(() => {});
-      }, [activeSessionId]);
+      }, [currentBoardId]);
 
       // Periodic poll from server to receive AI modifications (ui_board_mutate)
       useEffect(() => {
-        const sid = activeSessionId;
+        const bid = currentBoardId;
         const interval = setInterval(() => {
-          fetch(`/api/ui-board?session=${encodeURIComponent(sid)}`)
+          fetch(`/api/ui-board?id=${encodeURIComponent(bid)}`)
             .then(res => res.json())
             .then(data => {
               if (data?.ok && Array.isArray(data.elements)) {
-                // If element count or content changed from external (e.g. AI tool)
                 setElements(curr => {
                   if (JSON.stringify(curr) !== JSON.stringify(data.elements)) {
                     return data.elements;
                   }
                   return curr;
                 });
+                if (data.name && data.name !== currentBoardName) {
+                  setCurrentBoardName(data.name);
+                }
               }
             })
             .catch(() => {});
         }, 3000);
         return () => clearInterval(interval);
-      }, [activeSessionId]);
+      }, [currentBoardId, currentBoardName]);
 
       // Undo / Redo
       const handleUndo = useCallback(() => {
@@ -622,28 +1254,36 @@ window.__ModuleLoader__.load({
           const nextIdx = historyIndex - 1;
           setHistoryIndex(nextIdx);
           setElements(history[nextIdx]);
-          const sid = activeSessionId;
-          fetch(`/api/ui-board?session=${encodeURIComponent(sid)}`, {
+          const bid = currentBoardId;
+          const bname = currentBoardName;
+          try {
+            localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify(history[nextIdx]));
+          } catch (_) {}
+          fetch("/api/ui-board", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ session: sid, elements: history[nextIdx] })
+            body: JSON.stringify({ id: bid, name: bname, session: activeSessionId, elements: history[nextIdx] })
           }).catch(() => {});
         }
-      }, [history, historyIndex, activeSessionId]);
+      }, [history, historyIndex, currentBoardId, currentBoardName, activeSessionId]);
 
       const handleRedo = useCallback(() => {
         if (historyIndex < history.length - 1) {
           const nextIdx = historyIndex + 1;
           setHistoryIndex(nextIdx);
           setElements(history[nextIdx]);
-          const sid = activeSessionId;
-          fetch(`/api/ui-board?session=${encodeURIComponent(sid)}`, {
+          const bid = currentBoardId;
+          const bname = currentBoardName;
+          try {
+            localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify(history[nextIdx]));
+          } catch (_) {}
+          fetch("/api/ui-board", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ session: sid, elements: history[nextIdx] })
+            body: JSON.stringify({ id: bid, name: bname, session: activeSessionId, elements: history[nextIdx] })
           }).catch(() => {});
         }
-      }, [history, historyIndex, activeSessionId]);
+      }, [history, historyIndex, currentBoardId, currentBoardName, activeSessionId]);
 
       // Window drag handler
       const handleHeaderMouseDown = (e) => {
@@ -1178,10 +1818,55 @@ window.__ModuleLoader__.load({
         }, [
           h("div", { className: "uib-title-cluster" }, [
             h("span", { style: { fontSize: "16px" } }, "🎨"),
-            h("span", null, "UI Design & Wireframe Board"),
+            isEditingBoardName ?
+              h("input", {
+                className: "uib-board-title-input",
+                value: boardNameEdit,
+                autoFocus: true,
+                onChange: (e) => setBoardNameEdit(e.target.value),
+                onBlur: handleSaveBoardName,
+                onKeyDown: (e) => {
+                  if (e.key === "Enter") handleSaveBoardName();
+                  if (e.key === "Escape") setIsEditingBoardName(false);
+                }
+              }) :
+              h("div", {
+                className: "uib-board-title-wrapper",
+                title: "Click to rename this board",
+                onClick: () => {
+                  setBoardNameEdit(currentBoardName);
+                  setIsEditingBoardName(true);
+                }
+              }, [
+                h("span", { className: "uib-board-title-text" }, currentBoardName),
+                h("span", { style: { fontSize: "11px", opacity: 0.6 } }, "✏️")
+              ]),
             h("span", { className: "uib-action-badge" }, `${elements.length} ${elements.length === 1 ? "element" : "elements"}`)
           ]),
           h("div", { className: "uib-header-controls" }, [
+            // Quick Boards button in header
+            h("button", {
+              className: "uib-btn-secondary",
+              style: { height: "26px", padding: "0 8px", fontSize: "11px", gap: "4px" },
+              title: "Open saved boards manager",
+              onClick: () => setShowBoardsModal(true)
+            }, [
+              h(SvgFolder),
+              h("span", null, "Boards")
+            ]),
+            // Quick Save button in header
+            h("button", {
+              className: "uib-icon-btn",
+              title: "Save current board now",
+              onClick: handleManualSave
+            }, h(SvgSave)),
+            // Quick New Board button in header
+            h("button", {
+              className: "uib-icon-btn",
+              title: "Create new board",
+              onClick: handleCreateNewBoard
+            }, h(SvgPlus)),
+            h("div", { className: "uib-tool-sep" }),
             // Dock Right button
             h("button", {
               className: `uib-icon-btn ${layoutMode === "side-right" ? "active" : ""}`,
@@ -1340,7 +2025,27 @@ window.__ModuleLoader__.load({
                 className: "uib-tool-btn",
                 onClick: () => setZoom(z => Math.min(2.2, Number((z + 0.15).toFixed(2)))),
                 title: "Zoom in"
-              }, "🔍 +")
+              }, "🔍 +"),
+
+              h("div", { className: "uib-tool-sep" }),
+
+              // Boards management quick buttons
+              h("button", {
+                className: "uib-tool-btn btn-text",
+                onClick: () => setShowBoardsModal(true),
+                title: "Manage and open saved boards"
+              }, [
+                h("span", null, "📁"),
+                h("span", null, "Boards")
+              ]),
+              h("button", {
+                className: "uib-tool-btn btn-text",
+                onClick: handleManualSave,
+                title: "Save current board"
+              }, [
+                h("span", null, "💾"),
+                h("span", null, "Save")
+              ])
             ]),
 
             // AI Action Button on the right
@@ -1735,7 +2440,120 @@ window.__ModuleLoader__.load({
             className: "uib-resize-handle",
             onMouseDown: handleResizeMouseDown
           }) : null
-        ])
+        ]),
+
+        // Saved Boards Manager Modal
+        showBoardsModal ? h("div", {
+          className: "uib-modal-overlay",
+          onClick: (e) => { if (e.target === e.currentTarget) setShowBoardsModal(false); }
+        }, [
+          h("div", { className: "uib-modal-card" }, [
+            // Modal Head
+            h("div", { className: "uib-modal-head" }, [
+              h("div", { className: "uib-modal-title" }, [
+                h("span", { style: { fontSize: "18px" } }, "📁"),
+                h("span", null, "Saved Boards")
+              ]),
+              h("div", { style: { display: "flex", gap: "6px", alignItems: "center" } }, [
+                h("button", {
+                  className: "uib-btn-primary",
+                  onClick: handleCreateNewBoard
+                }, "➕ New Board"),
+                h("button", {
+                  className: "uib-btn-secondary",
+                  onClick: () => boardImportInputRef.current?.click()
+                }, "📥 Import JSON"),
+                h("button", {
+                  className: "uib-icon-btn",
+                  onClick: () => setShowBoardsModal(false)
+                }, h(SvgClose))
+              ])
+            ]),
+
+            // Search input
+            h("div", { className: "uib-search-bar" }, [
+              h("input", {
+                className: "uib-search-input",
+                placeholder: "🔍 Search boards by name...",
+                value: boardsSearch,
+                onChange: (e) => setBoardsSearch(e.target.value)
+              })
+            ]),
+
+            // Modal Body: Board List
+            h("div", { className: "uib-modal-body" }, [
+              (() => {
+                const filtered = savedBoards.filter(b => {
+                  if (!boardsSearch.trim()) return true;
+                  const query = boardsSearch.toLowerCase();
+                  return (b.name && b.name.toLowerCase().includes(query)) || (b.id && b.id.toLowerCase().includes(query));
+                });
+
+                if (filtered.length === 0) {
+                  return h("div", { className: "uib-empty-boards" }, [
+                    h("div", { style: { fontSize: "32px", marginBottom: "8px" } }, "📂"),
+                    h("div", null, boardsSearch ? "No matching boards found." : "No saved boards yet. Create a new one!")
+                  ]);
+                }
+
+                return filtered.map(b => {
+                  const isActive = b.id === currentBoardId;
+                  return h("div", {
+                    key: b.id,
+                    className: `uib-board-card ${isActive ? "active" : ""}`,
+                    onClick: () => handleLoadBoard(b.id, b.name)
+                  }, [
+                    h("div", { className: "uib-board-card-info" }, [
+                      h("div", { className: "uib-board-card-title-row" }, [
+                        h("span", { style: { fontSize: "16px" } }, "🎨"),
+                        h("span", { className: "uib-board-card-name" }, b.name || "Untitled Board"),
+                        isActive ? h("span", { className: "uib-active-pill" }, "Active") : null
+                      ]),
+                      h("div", { className: "uib-board-card-meta" }, [
+                        h("span", null, `${b.count || 0} ${b.count === 1 ? "element" : "elements"}`),
+                        h("span", null, "•"),
+                        h("span", null, formatTimeAgo(b.updatedAt))
+                      ])
+                    ]),
+                    h("div", {
+                      className: "uib-board-card-actions",
+                      onClick: (e) => e.stopPropagation()
+                    }, [
+                      h("button", {
+                        className: "uib-card-action-btn",
+                        title: "Open this board",
+                        onClick: () => handleLoadBoard(b.id, b.name)
+                      }, "📂 Open"),
+                      h("button", {
+                        className: "uib-card-action-btn",
+                        title: "Export to JSON file",
+                        onClick: (e) => handleExportBoardById(b.id, b.name, e)
+                      }, "💾 Export"),
+                      h("button", {
+                        className: "uib-card-action-btn danger",
+                        title: "Delete this board",
+                        onClick: (e) => handleDeleteBoard(b.id, b.name, e)
+                      }, "🗑️")
+                    ])
+                  ]);
+                });
+              })()
+            ])
+          ])
+        ]) : null,
+
+        // Hidden input for board JSON import
+        h("input", {
+          ref: boardImportInputRef,
+          type: "file",
+          accept: ".json,.uiboard.json",
+          style: { display: "none" },
+          onChange: (e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImportBoardFile(file);
+            e.target.value = "";
+          }
+        })
       ]);
     }
 

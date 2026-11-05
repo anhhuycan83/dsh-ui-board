@@ -41,6 +41,15 @@
   - **Spacebar Pan**: Hold `Space` and drag with mouse to pan smoothly across the canvas.
   - **Zoom Controls**: Zoom In (`+`), Zoom Out (`-`), Reset (`100%`), or `Ctrl + MouseWheel`.
 
+- **📁 Complete Board Management & Persistence**:
+  - **Inline Renaming**: Click the board title directly in the header to rename anytime.
+  - **Saved Boards Manager (`📁 Boards`)**: Browse all previous boards with search, element count, and last-modified time.
+  - **Create New Board (`➕ New Board`)**: Start fresh boards without losing your past work.
+  - **Open & Resume (`📂 Open`)**: Switch between past boards seamlessly; resumes right where you left off.
+  - **Manual & Auto-Save (`💾 Save`)**: Automatic real-time persistence with explicit save feedback.
+  - **Export to File (`💾 Export JSON`)**: Download any board as a `.uiboard.json` file for offline backup or sharing.
+  - **Import from File (`📥 Import JSON`)**: Upload any `.json` or `.uiboard.json` file to restore onto your board.
+
 - **🤖 Two-Way AI Collaboration**:
   1. **Visual Vision (`📸 Send to AI`)**: Captures high-res canvas snapshot directly to clipboard for image analysis in chat.
   2. **AI Read (`ui_board_read`)**: AI agent inspects screens, buttons, inputs, labels, and user flows via structured JSON.
