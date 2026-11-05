@@ -636,6 +636,8 @@ window.__ModuleLoader__.load({
       const [currentColor, setCurrentColor] = useState("#2563eb");
       const [strokeWidth, setStrokeWidth] = useState(2);
       const [elements, setElements] = useState([]);
+      const elementsRef = useRef(elements);
+      elementsRef.current = elements;
       const [history, setHistory] = useState([]);
       const [historyIndex, setHistoryIndex] = useState(-1);
       const [selectedId, setSelectedId] = useState(null);
@@ -812,6 +814,7 @@ window.__ModuleLoader__.load({
 
       // Push state into undo history and auto save
       const commitElements = useCallback((nextElements) => {
+        elementsRef.current = nextElements;
         setElements(nextElements);
         setHistory(prev => {
           const trimmed = prev.slice(0, historyIndex + 1);
@@ -1409,7 +1412,9 @@ window.__ModuleLoader__.load({
             lineWidth: strokeWidth
           };
           drawingRef.current = { type: "pen", id: newId, points: [[pt.x, pt.y]] };
-          setElements(prev => [...prev, newStroke]);
+          const next = [...elementsRef.current, newStroke];
+          elementsRef.current = next;
+          setElements(next);
           return;
         }
 
@@ -1419,7 +1424,9 @@ window.__ModuleLoader__.load({
           type: currentTool,
           id: newId,
           startX: pt.x,
-          startY: pt.y
+          startY: pt.y,
+          hasMoved: false,
+          currentElement: null
         };
       };
 
@@ -1466,31 +1473,36 @@ window.__ModuleLoader__.load({
         if (draw.type === "moving") {
           const dx = pt.x - draw.startX;
           const dy = pt.y - draw.startY;
-          setElements(prev => prev.map(el => {
+          const updated = elementsRef.current.map(el => {
             if (el.id === draw.id) {
               return { ...el, x: Math.max(0, draw.initialElemX + dx), y: Math.max(0, draw.initialElemY + dy) };
             }
             return el;
-          }));
+          });
+          elementsRef.current = updated;
+          setElements(updated);
           return;
         }
 
         if (draw.type === "pen") {
           draw.points.push([pt.x, pt.y]);
-          setElements(prev => prev.map(el => {
+          const updated = elementsRef.current.map(el => {
             if (el.id === draw.id) {
               return { ...el, points: [...draw.points] };
             }
             return el;
-          }));
+          });
+          elementsRef.current = updated;
+          setElements(updated);
           return;
         }
 
         // Preview rectangle or arrow while dragging
+        draw.hasMoved = true;
         const minX = Math.min(draw.startX, pt.x);
         const minY = Math.min(draw.startY, pt.y);
-        const w = Math.max(20, Math.abs(pt.x - draw.startX));
-        const h = Math.max(20, Math.abs(pt.y - draw.startY));
+        const w = Math.max(10, Math.abs(pt.x - draw.startX));
+        const h = Math.max(10, Math.abs(pt.y - draw.startY));
 
         let defaultLabel = "";
         let fill = "transparent";
@@ -1515,7 +1527,7 @@ window.__ModuleLoader__.load({
           type: draw.type,
           x: minX,
           y: minY,
-          width: draw.type === "button" ? Math.min(44, h) : (draw.type === "input" ? Math.min(38, h) : h),
+          width: draw.type === "button" ? Math.min(44, h) : (draw.type === "input" ? Math.min(38, h) : w),
           height: draw.type === "button" ? Math.min(44, h) : (draw.type === "input" ? Math.min(38, h) : h),
           label: defaultLabel,
           color: currentColor,
@@ -1526,11 +1538,12 @@ window.__ModuleLoader__.load({
           endX: pt.x,
           endY: pt.y
         };
+        draw.currentElement = previewElement;
 
-        setElements(prev => {
-          const filtered = prev.filter(el => el.id !== draw.id);
-          return [...filtered, previewElement];
-        });
+        const baseList = elementsRef.current.filter(el => el.id !== draw.id);
+        const nextList = [...baseList, previewElement];
+        elementsRef.current = nextList;
+        setElements(nextList);
       };
 
       const handleCanvasMouseUp = () => {
@@ -1542,16 +1555,76 @@ window.__ModuleLoader__.load({
         const draw = drawingRef.current;
         drawingRef.current = null;
 
-        let nextList = elements;
+        let currentList = [...elementsRef.current];
+
         if (draw.type !== "moving" && draw.type !== "pen") {
+          // If user clicked or barely dragged (< 15px), create a default-sized component at click position
+          if (!draw.hasMoved || !draw.currentElement || (draw.currentElement.width < 15 && draw.currentElement.height < 15)) {
+            let defaultW = 160;
+            let defaultH = 80;
+            let defaultLabel = "";
+            let fill = "transparent";
+
+            if (draw.type === "screen") {
+              defaultW = 320;
+              defaultH = 420;
+              defaultLabel = "New Screen";
+              fill = "rgba(37, 99, 235, 0.04)";
+            } else if (draw.type === "button") {
+              defaultW = 140;
+              defaultH = 38;
+              defaultLabel = "Button";
+              fill = currentColor;
+            } else if (draw.type === "input") {
+              defaultW = 200;
+              defaultH = 38;
+              defaultLabel = "Enter text...";
+              fill = "#ffffff";
+            } else if (draw.type === "box") {
+              defaultW = 220;
+              defaultH = 140;
+              defaultLabel = "Container";
+              fill = "transparent";
+            } else if (draw.type === "text") {
+              defaultW = 120;
+              defaultH = 32;
+              defaultLabel = "Heading";
+            } else if (draw.type === "arrow") {
+              defaultW = 140;
+              defaultH = 0;
+              defaultLabel = "";
+            }
+
+            const createdElement = {
+              id: draw.id,
+              type: draw.type,
+              x: draw.startX,
+              y: draw.startY,
+              width: defaultW,
+              height: defaultH,
+              label: defaultLabel,
+              color: currentColor,
+              fill: fill,
+              lineWidth: strokeWidth,
+              startX: draw.startX,
+              startY: draw.startY,
+              endX: draw.startX + defaultW,
+              endY: draw.startY + defaultH
+            };
+
+            currentList = [...currentList.filter(el => el.id !== draw.id), createdElement];
+          } else if (draw.currentElement) {
+            currentList = [...currentList.filter(el => el.id !== draw.id), draw.currentElement];
+          }
+
           setCurrentTool("select");
           setSelectedId(draw.id);
         }
 
-        // Auto-expand left/top if an element was placed near left/top border (< 50px)
+        // Auto-expand left/top if an element was placed near left/top border (< 40px)
         let minX = Infinity;
         let minY = Infinity;
-        for (const el of nextList) {
+        for (const el of currentList) {
           if (el.type === "pen" && el.points) {
             for (const [px, py] of el.points) {
               if (px < minX) minX = px;
@@ -1567,11 +1640,11 @@ window.__ModuleLoader__.load({
           }
         }
 
-        if (minX < 50 || minY < 50) {
-          const shiftX = minX < 50 ? Math.max(0, 350 - Math.floor(minX)) : 0;
-          const shiftY = minY < 50 ? Math.max(0, 250 - Math.floor(minY)) : 0;
+        if (minX < 40 || minY < 40) {
+          const shiftX = minX < 40 ? Math.max(0, 350 - Math.floor(minX)) : 0;
+          const shiftY = minY < 40 ? Math.max(0, 250 - Math.floor(minY)) : 0;
           if (shiftX > 0 || shiftY > 0) {
-            nextList = nextList.map(el => {
+            currentList = currentList.map(el => {
               if (el.type === "pen" && el.points) {
                 return { ...el, points: el.points.map(([px, py]) => [px + shiftX, py + shiftY]) };
               }
@@ -1591,11 +1664,11 @@ window.__ModuleLoader__.load({
               containerRef.current.scrollLeft += shiftX * zoom;
               containerRef.current.scrollTop += shiftY * zoom;
             }
-            showToast("✨ Canvas automatically expanded!");
           }
         }
 
-        commitElements(nextList);
+        elementsRef.current = currentList;
+        commitElements(currentList);
       };
 
       // Double-click to edit text label
