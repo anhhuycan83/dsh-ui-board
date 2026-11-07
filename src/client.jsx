@@ -554,7 +554,21 @@ function extractShapesSummary(editor) {
     return shapes.map(s => {
       let label = '';
       if (s.props) {
-        label = s.props.text || s.props.name || s.props.label || '';
+        if (typeof s.props.text === 'string') {
+          label = s.props.text;
+        } else if (typeof s.props.name === 'string') {
+          label = s.props.name;
+        } else if (typeof s.props.label === 'string') {
+          label = s.props.label;
+        } else if (s.props.richText) {
+          const extractText = (node) => {
+            if (!node) return '';
+            if (node.text) return node.text;
+            if (Array.isArray(node.content)) return node.content.map(extractText).join(' ');
+            return '';
+          };
+          label = extractText(s.props.richText);
+        }
       }
       return {
         id: s.id,
@@ -570,6 +584,178 @@ function extractShapesSummary(editor) {
     });
   } catch (_) {
     return [];
+  }
+}
+
+/** Convert legacy elements array into a valid Tldraw store snapshot */
+function convertLegacyElementsToSnapshot(editor, elements) {
+  if (!editor || !Array.isArray(elements) || elements.length === 0) return null;
+  try {
+    const baseSnapshot = editor.store.getStoreSnapshot();
+    const schema = baseSnapshot.schema;
+    const records = {};
+
+    elements.forEach((item, idx) => {
+      const sid = createShapeId(item.id || `legacy_${idx}`);
+      const index = `a${idx + 1}`;
+
+      if (item.type === 'screen' || item.type === 'frame') {
+        records[sid] = {
+          id: sid,
+          typeName: 'shape',
+          type: 'frame',
+          x: item.x || 100,
+          y: item.y || 100,
+          rotation: 0,
+          index,
+          parentId: 'page:page',
+          isLocked: false,
+          opacity: 1,
+          meta: {},
+          props: {
+            w: item.width || 320,
+            h: item.height || 420,
+            name: item.label || 'Screen',
+            color: 'black'
+          }
+        };
+      } else if (item.type === 'text') {
+        records[sid] = {
+          id: sid,
+          typeName: 'shape',
+          type: 'text',
+          x: item.x || 100,
+          y: item.y || 100,
+          rotation: 0,
+          index,
+          parentId: 'page:page',
+          isLocked: false,
+          opacity: 1,
+          meta: {},
+          props: {
+            color: 'black',
+            size: 'm',
+            w: item.width || 120,
+            font: 'draw',
+            textAlign: 'start',
+            autoSize: true,
+            scale: 1,
+            richText: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: item.label || 'Text' }] }] }
+          }
+        };
+      } else if (item.type === 'arrow') {
+        const sx = item.startX || item.x || 100;
+        const sy = item.startY || item.y || 100;
+        const ex = item.endX || (sx + (item.width || 160));
+        const ey = item.endY || sy;
+        records[sid] = {
+          id: sid,
+          typeName: 'shape',
+          type: 'arrow',
+          x: sx,
+          y: sy,
+          rotation: 0,
+          index,
+          parentId: 'page:page',
+          isLocked: false,
+          opacity: 1,
+          meta: {},
+          props: {
+            kind: 'arc',
+            elbowMidPoint: 0.5,
+            dash: 'draw',
+            size: 'm',
+            fill: 'none',
+            color: 'blue',
+            labelColor: 'black',
+            bend: 0,
+            start: { x: 0, y: 0 },
+            end: { x: ex - sx, y: ey - sy },
+            arrowheadStart: 'none',
+            arrowheadEnd: 'arrow',
+            richText: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: item.label || '' }] }] },
+            labelPosition: 0.5,
+            font: 'draw',
+            scale: 1
+          }
+        };
+      } else if (item.type === 'pen' || item.type === 'draw') {
+        const pts = item.points || [[0, 0], [10, 10]];
+        const minX = Math.min(...pts.map(p => p[0]));
+        const minY = Math.min(...pts.map(p => p[1]));
+        const pathStr = pts.map((p, i) => (i === 0 ? 'M' : 'L') + (p[0] - minX) + ',' + (p[1] - minY)).join(' ');
+        records[sid] = {
+          id: sid,
+          typeName: 'shape',
+          type: 'draw',
+          x: minX,
+          y: minY,
+          rotation: 0,
+          index,
+          parentId: 'page:page',
+          isLocked: false,
+          opacity: 1,
+          meta: {},
+          props: {
+            segments: [{ type: 'free', path: pathStr }],
+            color: 'blue',
+            fill: 'none',
+            dash: 'draw',
+            size: 'm',
+            isComplete: true,
+            isClosed: false,
+            isPen: false,
+            scale: 1,
+            scaleX: 1,
+            scaleY: 1
+          }
+        };
+      } else {
+        records[sid] = {
+          id: sid,
+          typeName: 'shape',
+          type: 'geo',
+          x: item.x || 100,
+          y: item.y || 100,
+          rotation: 0,
+          index,
+          parentId: 'page:page',
+          isLocked: false,
+          opacity: 1,
+          meta: {},
+          props: {
+            w: item.width || 140,
+            h: item.height || 40,
+            geo: 'rectangle',
+            dash: 'draw',
+            growY: 0,
+            url: '',
+            scale: 1,
+            flipX: false,
+            flipY: false,
+            color: item.type === 'button' ? 'blue' : 'black',
+            labelColor: 'black',
+            fill: item.type === 'button' ? 'semi' : 'none',
+            size: 'm',
+            font: 'draw',
+            align: 'middle',
+            verticalAlign: 'middle',
+            richText: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: item.label || '' }] }] }
+          }
+        };
+      }
+    });
+
+    return {
+      store: {
+        ...baseSnapshot.store,
+        ...records
+      },
+      schema
+    };
+  } catch (err) {
+    console.error('Failed to convert legacy elements:', err);
+    return null;
   }
 }
 
@@ -858,7 +1044,7 @@ function UIBoardModal({ sessionId, onClose }) {
       const cached = localStorage.getItem(`dsh_ui_board_${bid}`);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed?.store) {
+        if (parsed?.store && parsed?.schema) {
           editor.store.loadStoreSnapshot(parsed);
           setElementCount(editor.getCurrentPageShapes().length);
           loaded = true;
@@ -871,36 +1057,23 @@ function UIBoardModal({ sessionId, onClose }) {
       .then(res => res.json())
       .then(data => {
         if (data?.ok) {
-          if (data.snapshot?.store) {
+          if (data.snapshot?.store && data.snapshot?.schema) {
             editor.store.loadStoreSnapshot(data.snapshot);
             setElementCount(editor.getCurrentPageShapes().length);
           } else if (!loaded && Array.isArray(data.elements) && data.elements.length > 0) {
-            // Restore legacy elements into shapes
-            const newShapes = data.elements.map(item => {
-              const sid = createShapeId(item.id);
-              if (item.type === 'screen' || item.type === 'frame') {
-                return { id: sid, type: 'frame', x: item.x || 100, y: item.y || 100, props: { w: item.width || 320, h: item.height || 460, name: item.label || 'Screen' } };
-              }
-              if (item.type === 'button' || item.type === 'box' || item.type === 'input') {
-                return { id: sid, type: 'geo', x: item.x || 120, y: item.y || 120, props: { w: item.width || 140, h: item.height || 40, geo: 'rectangle', text: item.label || 'Component', color: 'blue' } };
-              }
-              if (item.type === 'text') {
-                return { id: sid, type: 'text', x: item.x || 100, y: item.y || 100, props: { text: item.label || 'Text' } };
-              }
-              if (item.type === 'arrow') {
-                return { id: sid, type: 'arrow', x: item.startX || item.x || 100, y: item.startY || item.y || 100, props: { text: item.label || '' } };
-              }
-              return null;
-            }).filter(Boolean);
-            if (newShapes.length > 0) {
-              editor.createShapes(newShapes);
-              setElementCount(newShapes.length);
+            // Restore legacy elements into a valid snapshot safely
+            const converted = convertLegacyElementsToSnapshot(editor, data.elements);
+            if (converted) {
+              editor.store.loadStoreSnapshot(converted);
+              setElementCount(editor.getCurrentPageShapes().length);
             }
           }
           if (data.name) setCurrentBoardName(data.name);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('Failed to load board from server:', err);
+      });
 
     // Listen to changes with debounced auto-save
     const unlisten = editor.store.listen(() => {
@@ -963,9 +1136,16 @@ function UIBoardModal({ sessionId, onClose }) {
       fetch(`/api/ui-board?id=${encodeURIComponent(boardId)}`)
         .then(res => res.json())
         .then(data => {
-          if (data?.ok && data.snapshot?.store) {
+          if (data?.ok && data.snapshot?.store && data.snapshot?.schema) {
             editor.store.loadStoreSnapshot(data.snapshot);
             setElementCount(editor.getCurrentPageShapes().length);
+            if (data.name) setCurrentBoardName(data.name);
+          } else if (data?.ok && Array.isArray(data.elements) && data.elements.length > 0) {
+            const converted = convertLegacyElementsToSnapshot(editor, data.elements);
+            if (converted) {
+              editor.store.loadStoreSnapshot(converted);
+              setElementCount(editor.getCurrentPageShapes().length);
+            }
             if (data.name) setCurrentBoardName(data.name);
           } else {
             // Check local cache
@@ -973,7 +1153,7 @@ function UIBoardModal({ sessionId, onClose }) {
               const cached = localStorage.getItem(`dsh_ui_board_${boardId}`);
               if (cached) {
                 const parsed = JSON.parse(cached);
-                if (parsed?.store) {
+                if (parsed?.store && parsed?.schema) {
                   editor.store.loadStoreSnapshot(parsed);
                   setElementCount(editor.getCurrentPageShapes().length);
                 }
