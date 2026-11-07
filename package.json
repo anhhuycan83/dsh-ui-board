@@ -19,6 +19,9 @@
     "locale/*.json",
     "icon.svg"
   ],
+  "scripts": {
+    "build": "node build.js"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -30,5 +33,11 @@
         "@deepseek-ai/dsh-client-ui-conversation"
       ]
     }
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "dependencies": {
+    "tldraw": "^5.6.0"
   }
 }

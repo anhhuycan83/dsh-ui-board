@@ -187,24 +187,19 @@ function generateHierarchySummary(elements) {
     return 'The UI Board is currently empty. No screens or components have been created yet.';
   }
 
-  const screens = elements.filter(e => e.type === 'screen');
-  const buttons = elements.filter(e => e.type === 'button');
-  const inputs = elements.filter(e => e.type === 'input');
-  const boxes = elements.filter(e => e.type === 'box');
-  const texts = elements.filter(e => e.type === 'text');
+  const screens = elements.filter(e => e.type === 'screen' || e.type === 'frame');
   const arrows = elements.filter(e => e.type === 'arrow');
-  const penStrokes = elements.filter(e => e.type === 'pen');
 
   let summary = `### UI Board Overview (${elements.length} elements total)\n\n`;
 
   if (screens.length > 0) {
-    summary += `#### Screens / Windows (${screens.length}):\n`;
+    summary += `#### Screens / Window Frames (${screens.length}):\n`;
     for (const screen of screens) {
       summary += `* **[Screen] ${screen.label || 'Untitled Screen'}** (ID: \`${screen.id}\`, Pos: [${screen.x}, ${screen.y}], Size: ${screen.width}x${screen.height})\n`;
 
       // Find children within screen bounds (exclude other screens and arrows)
       const children = elements.filter(e => {
-        if (e.id === screen.id || e.type === 'screen' || e.type === 'arrow') return false;
+        if (e.id === screen.id || e.type === 'screen' || e.type === 'frame' || e.type === 'arrow') return false;
         return (
           e.x >= screen.x &&
           e.y >= screen.y &&
@@ -215,7 +210,7 @@ function generateHierarchySummary(elements) {
 
       if (children.length > 0) {
         for (const child of children) {
-          const typeLabel = child.type.toUpperCase();
+          const typeLabel = (child.geo ? `${child.type}:${child.geo}` : child.type).toUpperCase();
           summary += `  - \`${typeLabel}\`: "${child.label || child.props?.placeholder || 'No label'}" (ID: \`${child.id}\`)\n`;
         }
       } else {
@@ -237,7 +232,7 @@ function generateHierarchySummary(elements) {
   }
 
   const looseItems = elements.filter(e => {
-    if (e.type === 'screen' || e.type === 'arrow') return false;
+    if (e.type === 'screen' || e.type === 'frame' || e.type === 'arrow') return false;
     // Check if inside any screen
     const insideScreen = screens.some(s => (
       e.x >= s.x && e.y >= s.y &&
@@ -250,12 +245,13 @@ function generateHierarchySummary(elements) {
   if (looseItems.length > 0) {
     summary += `#### Standalone / Outside Elements (${looseItems.length}):\n`;
     for (const item of looseItems) {
-      if (item.type === 'pen') {
+      if (item.type === 'pen' || item.type === 'draw') {
         summary += `* \`PEN STROKE\`: Freehand sketch line (ID: \`${item.id}\`)\n`;
       } else if (item.type === 'image') {
         summary += `* \`IMAGE\`: "${item.label || 'Image'}" (ID: \`${item.id}\`, Size: ${item.width}x${item.height})\n`;
       } else {
-        summary += `* \`${item.type.toUpperCase()}\`: "${item.label || item.props?.placeholder || ''}" (ID: \`${item.id}\`)\n`;
+        const typeLabel = (item.geo ? `${item.type}:${item.geo}` : item.type).toUpperCase();
+        summary += `* \`${typeLabel}\`: "${item.label || item.props?.placeholder || ''}" (ID: \`${item.id}\`)\n`;
       }
     }
   }

@@ -1,15 +1,23 @@
 # dsh-ui-board
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Powered by tldraw](https://img.shields.io/badge/Canvas_Engine-tldraw_v5-FF0080)](https://github.com/tldraw/tldraw)
 [![DeepSeek Harness](https://img.shields.io/badge/Plugin_for-DeepSeek_Harness-2563EB)](https://github.com/deepseek-ai/deepseek-harness)
 
-> Whiteboard & UI wireframe design canvas plugin for **DeepSeek Harness Web** with bi-directional AI collaboration.
+> Whiteboard & UI wireframe design canvas plugin for **DeepSeek Harness Web** powered by **Tldraw** with bi-directional AI collaboration.
 
 ![UI Board Icon](./icon.svg)
 
 ---
 
 ## ✨ Features
+
+- **⚡ World-Class Canvas Powered by [Tldraw](https://github.com/tldraw/tldraw)**:
+  - Infinite canvas with hardware-accelerated smooth zoom, pan, pinch, and navigation.
+  - Complete shape toolkit: Freehand draw, eraser, arrows, sticky notes, text, frames/screens, rectangles, ellipses, clouds, stars, and shapes.
+  - Rich styling controls: Colors, fill patterns, stroke widths, dash styles, fonts, and alignments.
+  - Native image drag & drop and clipboard paste (`Ctrl + V`).
+  - Automatic dark theme synchronization with DeepSeek Harness theme.
 
 - **🎨 Multi-Mode Window Layout**:
   - **Dock Right (`◨`)**: Pin the board to the right side with smooth responsive chat pushing.
