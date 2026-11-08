@@ -100,14 +100,15 @@ function listBoards() {
 
 function loadBoard(idOrSession) {
   const targetId = idOrSession || 'default';
-  if (boardCache.has(targetId)) {
-    return boardCache.get(targetId);
-  }
-
   ensureStorageDir();
   const filePath = getBoardPath(targetId);
   try {
     if (fs.existsSync(filePath)) {
+      const stats = fs.statSync(filePath);
+      const cached = boardCache.get(targetId);
+      if (cached && cached._mtime === stats.mtimeMs) {
+        return cached;
+      }
       const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
       if (data && Array.isArray(data.elements)) {
         if (!data.id) data.id = targetId;
@@ -116,12 +117,17 @@ function loadBoard(idOrSession) {
             targetId.startsWith('session-') ? `Session ${targetId.slice('session-'.length, 'session-'.length + 8)}` : `Board ${targetId.slice(0, 12)}`
           );
         }
+        data._mtime = stats.mtimeMs;
         boardCache.set(targetId, data);
         return data;
       }
     }
   } catch (err) {
     console.error(`[dsh-ui-board] error reading board file for ${targetId}:`, err);
+  }
+
+  if (boardCache.has(targetId)) {
+    return boardCache.get(targetId);
   }
 
   const defaultBoard = {
