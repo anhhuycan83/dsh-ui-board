@@ -125106,6 +125106,8 @@ function UIBoardModal({ sessionId, onClose }) {
   const isResizingRef = (0, import_react141.useRef)(false);
   const resizeStartRef = (0, import_react141.useRef)({ w: 0, h: 0, x: 0, y: 0 });
   const windowRef = (0, import_react141.useRef)(null);
+  const isMouseOverBoardRef = (0, import_react141.useRef)(false);
+  const tldrawWrapperRef = (0, import_react141.useRef)(null);
   const toastTimerRef = (0, import_react141.useRef)(null);
   const saveTimeoutRef = (0, import_react141.useRef)(null);
   const showToast = (0, import_react141.useCallback)((msg2) => {
@@ -125316,11 +125318,15 @@ function UIBoardModal({ sessionId, onClose }) {
   const handleEditorMount = (0, import_react141.useCallback)((editor) => {
     editorRef.current = editor;
     const handleKeyDown2 = (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "-" || e.key === "=")) {
+      if (!isMouseOverBoardRef.current && !windowRef.current?.contains(document.activeElement)) {
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "-" || e.key === "=" || e.key === "0")) {
         e.preventDefault();
         e.stopPropagation();
         if (e.key === "+" || e.key === "=") editor.zoomIn();
         if (e.key === "-") editor.zoomOut();
+        if (e.key === "0") editor.resetZoom();
       }
     };
     window.addEventListener("keydown", handleKeyDown2, true);
@@ -125372,6 +125378,29 @@ function UIBoardModal({ sessionId, onClose }) {
       window.removeEventListener("keydown", handleKeyDown2, true);
     };
   }, [currentBoardId, saveCurrentBoard]);
+  (0, import_react141.useEffect)(() => {
+    const el = tldrawWrapperRef.current;
+    if (!el) return;
+    const handleWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        const editor = editorRef.current;
+        if (editor) {
+          const rect = el.getBoundingClientRect();
+          const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          const zoomMultiplier = e.deltaY < 0 ? 1.15 : 0.85;
+          const currentZoom = editor.getZoomLevel();
+          const nextZoom = Math.max(0.1, Math.min(8, currentZoom * zoomMultiplier));
+          editor.zoomToBounds(editor.getViewportPageBounds(), { targetZoom: nextZoom });
+        }
+      }
+    };
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
   (0, import_react141.useEffect)(() => {
     const observer = new MutationObserver(() => {
       const isDark = document.body.hasAttribute("data-ds-dark-theme");
@@ -125666,7 +125695,13 @@ function UIBoardModal({ sessionId, onClose }) {
   return h2("div", {
     ref: windowRef,
     className: `uib-window ${isSideMode ? "side-mode" : ""}`,
-    style: windowStyle
+    style: windowStyle,
+    onMouseEnter: () => {
+      isMouseOverBoardRef.current = true;
+    },
+    onMouseLeave: () => {
+      isMouseOverBoardRef.current = false;
+    }
   }, [
     // Side resizer bar
     layoutMode === "side-right" ? h2("div", {
@@ -125768,7 +125803,10 @@ function UIBoardModal({ sessionId, onClose }) {
       ])
     ]),
     // Tldraw Canvas Container
-    h2("div", { className: "uib-tldraw-wrapper" }, [
+    h2("div", {
+      ref: tldrawWrapperRef,
+      className: "uib-tldraw-wrapper"
+    }, [
       h2(Tldraw, {
         autoFocus: true,
         inferDarkMode: true,

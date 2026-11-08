@@ -847,6 +847,8 @@ function UIBoardModal({ sessionId, onClose }) {
   const isResizingRef = useRef(false);
   const resizeStartRef = useRef({ w: 0, h: 0, x: 0, y: 0 });
   const windowRef = useRef(null);
+  const isMouseOverBoardRef = useRef(false);
+  const tldrawWrapperRef = useRef(null);
   const toastTimerRef = useRef(null);
   const saveTimeoutRef = useRef(null);
 
@@ -1081,11 +1083,16 @@ function UIBoardModal({ sessionId, onClose }) {
 
     // 1. Chặn phím tắt zoom của trình duyệt khi đang thao tác trên Board
     const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=')) {
+      // Only intercept if mouse is inside the board or board is focused
+      if (!isMouseOverBoardRef.current && !windowRef.current?.contains(document.activeElement)) {
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
         e.preventDefault();
         e.stopPropagation();
         if (e.key === '+' || e.key === '=') editor.zoomIn();
         if (e.key === '-') editor.zoomOut();
+        if (e.key === '0') editor.resetZoom();
       }
     };
     window.addEventListener('keydown', handleKeyDown, true);
@@ -1150,6 +1157,36 @@ function UIBoardModal({ sessionId, onClose }) {
       window.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [currentBoardId, saveCurrentBoard]);
+
+  // Intercept Ctrl+Wheel zoom directly on the board element with passive: false
+  useEffect(() => {
+    const el = tldrawWrapperRef.current;
+    if (!el) return;
+
+    const handleWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        // Prevent browser tab from zooming
+        e.preventDefault();
+        e.stopPropagation();
+
+        const editor = editorRef.current;
+        if (editor) {
+          // Zoom inside tldraw around current pointer position
+          const rect = el.getBoundingClientRect();
+          const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          const zoomMultiplier = e.deltaY < 0 ? 1.15 : 0.85;
+          const currentZoom = editor.getZoomLevel();
+          const nextZoom = Math.max(0.1, Math.min(8, currentZoom * zoomMultiplier));
+          editor.zoomToBounds(editor.getViewportPageBounds(), { targetZoom: nextZoom });
+        }
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
 
   // Dark theme observer
   useEffect(() => {
@@ -1487,7 +1524,9 @@ function UIBoardModal({ sessionId, onClose }) {
   return h('div', {
     ref: windowRef,
     className: `uib-window ${isSideMode ? 'side-mode' : ''}`,
-    style: windowStyle
+    style: windowStyle,
+    onMouseEnter: () => { isMouseOverBoardRef.current = true; },
+    onMouseLeave: () => { isMouseOverBoardRef.current = false; }
   }, [
     // Side resizer bar
     layoutMode === 'side-right' ? h('div', {
@@ -1598,7 +1637,10 @@ function UIBoardModal({ sessionId, onClose }) {
     ]),
 
     // Tldraw Canvas Container
-    h('div', { className: 'uib-tldraw-wrapper' }, [
+    h('div', {
+      ref: tldrawWrapperRef,
+      className: 'uib-tldraw-wrapper'
+    }, [
       h(Tldraw, {
         autoFocus: true,
         inferDarkMode: true,
