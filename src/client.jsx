@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { Tldraw, getSvgAsImage, createShapeId, b64Vecs } from 'tldraw';
+import { Tldraw, getSvgAsImage, createShapeId, getPointsFromDrawSegments } from 'tldraw';
 import tldrawCss from 'tldraw/tldraw.css';
 
 const h = React.createElement;
@@ -603,18 +603,12 @@ function extractShapesSummary(editor) {
       };
 
       if ((s.type === 'draw' || s.type === 'pen') && s.props?.segments) {
-        const points = [];
-        for (const seg of s.props.segments) {
-          if (seg.path) {
-            try {
-              const decoded = b64Vecs.decodePoints(seg.path);
-              for (const p of decoded) {
-                points.push([Math.round(s.x + p.x), Math.round(s.y + p.y)]);
-              }
-            } catch (_) {}
-          }
+        try {
+          const rawPts = getPointsFromDrawSegments(s.props.segments, s.props.scaleX || 1, s.props.scaleY || 1);
+          res.points = rawPts.map(p => [Math.round(s.x + p.x), Math.round(s.y + p.y)]);
+        } catch (_) {
+          res.points = [];
         }
-        res.points = points;
       } else if (s.type === 'arrow' && s.props) {
         res.startX = Math.round(s.x + (s.props.start?.x || 0));
         res.startY = Math.round(s.y + (s.props.start?.y || 0));
