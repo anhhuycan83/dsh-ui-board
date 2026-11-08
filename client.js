@@ -125315,6 +125315,15 @@ function UIBoardModal({ sessionId, onClose }) {
   }, [currentBoardId, currentBoardName, activeSessionId, refreshBoardsList, showToast]);
   const handleEditorMount = (0, import_react141.useCallback)((editor) => {
     editorRef.current = editor;
+    const handleKeyDown2 = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "-" || e.key === "=")) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === "+" || e.key === "=") editor.zoomIn();
+        if (e.key === "-") editor.zoomOut();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown2, true);
     const isDark = document.body.hasAttribute("data-ds-dark-theme");
     try {
       editor.user.updateUserPreferences({ colorScheme: isDark ? "dark" : "light" });
@@ -125360,6 +125369,7 @@ function UIBoardModal({ sessionId, onClose }) {
     });
     return () => {
       unlisten();
+      window.removeEventListener("keydown", handleKeyDown2, true);
     };
   }, [currentBoardId, saveCurrentBoard]);
   (0, import_react141.useEffect)(() => {

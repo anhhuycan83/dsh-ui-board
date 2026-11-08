@@ -1079,6 +1079,17 @@ function UIBoardModal({ sessionId, onClose }) {
   const handleEditorMount = useCallback((editor) => {
     editorRef.current = editor;
 
+    // 1. Chặn phím tắt zoom của trình duyệt khi đang thao tác trên Board
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === '+' || e.key === '=') editor.zoomIn();
+        if (e.key === '-') editor.zoomOut();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+
     // Synchronize initial dark theme
     const isDark = document.body.hasAttribute('data-ds-dark-theme');
     try {
@@ -1136,6 +1147,7 @@ function UIBoardModal({ sessionId, onClose }) {
 
     return () => {
       unlisten();
+      window.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [currentBoardId, saveCurrentBoard]);
 
