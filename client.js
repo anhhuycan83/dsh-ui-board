@@ -125691,9 +125691,10 @@ function UIBoardModal({ sessionId, onClose }) {
   } else if (layoutMode === "maximized") {
     windowStyle = {
       ...windowStyle,
-      inset: "16px",
-      width: "calc(100vw - 32px)",
-      height: "calc(100vh - 32px)"
+      inset: "0",
+      width: "100vw",
+      height: "100vh",
+      borderRadius: "0"
     };
   }
   const isSideMode = layoutMode === "side-right" || layoutMode === "side-left";
