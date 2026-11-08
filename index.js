@@ -112,6 +112,8 @@ function saveBoard(arg1, arg2) {
   let name = '';
   let sessionId = null;
   let createdAt = null;
+  let snapshot = null;
+  let svg = null;
 
   if (typeof arg1 === 'object' && arg1 !== null) {
     id = arg1.id || arg1.session || 'default';
@@ -119,6 +121,8 @@ function saveBoard(arg1, arg2) {
     name = arg1.name;
     sessionId = arg1.session || arg1.sessionId || null;
     createdAt = arg1.createdAt;
+    snapshot = arg1.snapshot || null;
+    svg = arg1.svg || null;
   } else {
     id = arg1 || 'default';
     elements = Array.isArray(arg2) ? arg2 : [];
@@ -142,6 +146,8 @@ function saveBoard(arg1, arg2) {
     name: finalName,
     sessionId: sessionId || existing.sessionId || (id.startsWith('session-') ? id : null),
     elements,
+    snapshot: snapshot || existing.snapshot || null,
+    svg: svg || existing.svg || null,
     createdAt: existing.createdAt || createdAt || Date.now(),
     updatedAt: Date.now()
   };
@@ -160,6 +166,10 @@ function saveBoard(arg1, arg2) {
   const filePath = getBoardPath(id);
   try {
     fs.writeFileSync(filePath, JSON.stringify(board, null, 2), 'utf-8');
+    if (board.svg) {
+      const svgPath = path.join(STORAGE_DIR, `board-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}.svg`);
+      fs.writeFileSync(svgPath, board.svg, 'utf-8');
+    }
   } catch (err) {
     console.error(`[dsh-ui-board] error writing board file for ${id}:`, err);
   }
@@ -182,6 +192,46 @@ function deleteBoard(id) {
   return false;
 }
 
+function renderAsciiStrokes(penStrokes) {
+  const allPoints = [];
+  penStrokes.forEach(s => {
+    if (Array.isArray(s.points)) {
+      s.points.forEach(p => allPoints.push(p));
+    }
+  });
+  if (allPoints.length < 2) return '';
+
+  const minX = Math.min(...allPoints.map(p => p[0]));
+  const maxX = Math.max(...allPoints.map(p => p[0]));
+  const minY = Math.min(...allPoints.map(p => p[1]));
+  const maxY = Math.max(...allPoints.map(p => p[1]));
+  const spanX = Math.max(1, maxX - minX);
+  const spanY = Math.max(1, maxY - minY);
+
+  const targetW = 60;
+  const targetH = Math.min(25, Math.max(8, Math.round((spanY / spanX) * targetW * 0.55)));
+  const grid = Array.from({ length: targetH }, () => Array(targetW).fill(' '));
+
+  penStrokes.forEach((stroke, sIdx) => {
+    const pts = stroke.points || [];
+    const char = String((sIdx % 9) + 1);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const steps = Math.max(1, Math.max(Math.abs(p2[0] - p1[0]), Math.abs(p2[1] - p1[1])) * 2);
+      for (let step = 0; step <= steps; step++) {
+        const x = p1[0] + (p2[0] - p1[0]) * (step / steps);
+        const y = p1[1] + (p2[1] - p1[1]) * (step / steps);
+        const gx = Math.min(targetW - 1, Math.max(0, Math.floor(((x - minX) / spanX) * (targetW - 1))));
+        const gy = Math.min(targetH - 1, Math.max(0, Math.floor(((y - minY) / spanY) * (targetH - 1))));
+        grid[gy][gx] = char;
+      }
+    }
+  });
+
+  return '```text\n' + grid.map(row => row.join('')).join('\n') + '\n```\n';
+}
+
 function generateHierarchySummary(elements) {
   if (!elements || elements.length === 0) {
     return 'The UI Board is currently empty. No screens or components have been created yet.';
@@ -189,8 +239,17 @@ function generateHierarchySummary(elements) {
 
   const screens = elements.filter(e => e.type === 'screen' || e.type === 'frame');
   const arrows = elements.filter(e => e.type === 'arrow');
+  const penStrokes = elements.filter(e => (e.type === 'pen' || e.type === 'draw') && Array.isArray(e.points) && e.points.length > 0);
 
   let summary = `### UI Board Overview (${elements.length} elements total)\n\n`;
+
+  if (penStrokes.length > 0) {
+    summary += `#### Freehand Drawings / Handwritten Sketches (${penStrokes.length} strokes):\n`;
+    const ascii = renderAsciiStrokes(penStrokes);
+    if (ascii) {
+      summary += `Visual sketch rendering:\n${ascii}\n`;
+    }
+  }
 
   if (screens.length > 0) {
     summary += `#### Screens / Window Frames (${screens.length}):\n`;
@@ -246,12 +305,13 @@ function generateHierarchySummary(elements) {
     summary += `#### Standalone / Outside Elements (${looseItems.length}):\n`;
     for (const item of looseItems) {
       if (item.type === 'pen' || item.type === 'draw') {
-        summary += `* \`PEN STROKE\`: Freehand sketch line (ID: \`${item.id}\`)\n`;
+        const strokeLen = item.points?.length ? ` (${item.points.length} points)` : '';
+        summary += `* \`PEN STROKE\`: Freehand sketch line${strokeLen} at [${item.x}, ${item.y}] (ID: \`${item.id}\`)\n`;
       } else if (item.type === 'image') {
         summary += `* \`IMAGE\`: "${item.label || 'Image'}" (ID: \`${item.id}\`, Size: ${item.width}x${item.height})\n`;
       } else {
         const typeLabel = (item.geo ? `${item.type}:${item.geo}` : item.type).toUpperCase();
-        summary += `* \`${typeLabel}\`: "${item.label || item.props?.placeholder || ''}" (ID: \`${item.id}\`)\n`;
+        summary += `* \`${typeLabel}\`: "${item.label || item.props?.placeholder || ''}" at [${item.x}, ${item.y}] Size: ${item.width}x${item.height} (ID: \`${item.id}\`)\n`;
       }
     }
   }
@@ -416,8 +476,17 @@ export function apply(ctx) {
         },
         async execute(args, exec) {
           const sid = args.board_id || args.session || exec.agent?.session?.id || 'default';
-          const board = loadBoard(sid);
-          const header = `**Board: "${board.name || 'Untitled'}"** (ID: \`${board.id || sid}\`)\n\n`;
+          let board = loadBoard(sid);
+
+          // If the board is empty, but another board exists (e.g. user created or switched to a named board), check the most recently modified board!
+          if ((!board.elements || board.elements.length === 0) && !args.board_id && !args.session) {
+            const list = listBoards();
+            if (list.length > 0 && list[0].count > 0) {
+              board = loadBoard(list[0].id);
+            }
+          }
+
+          const header = `**Board: "${board.name || 'Untitled'}"** (ID: \`${board.id || sid}\`, Last Updated: ${new Date(board.updatedAt || Date.now()).toLocaleTimeString()})\n\n`;
           const summary = header + generateHierarchySummary(board.elements);
           return {
             summary,

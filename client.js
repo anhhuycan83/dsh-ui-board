@@ -124872,18 +124872,40 @@ function extractShapesSummary(editor) {
           label = extractText(s.props.richText);
         }
       }
-      return {
+      const bounds = editor.getShapePageBounds(s);
+      const res = {
         id: s.id,
         type: s.type,
         // 'geo', 'arrow', 'text', 'note', 'frame', 'image', 'draw'
-        x: Math.round(s.x),
-        y: Math.round(s.y),
-        width: Math.round(s.props?.w || s.props?.width || 0),
-        height: Math.round(s.props?.h || s.props?.height || 0),
+        x: Math.round(bounds?.x ?? s.x),
+        y: Math.round(bounds?.y ?? s.y),
+        width: Math.round(bounds?.w || s.props?.w || s.props?.width || 0),
+        height: Math.round(bounds?.h || s.props?.h || s.props?.height || 0),
         label: String(label || "").trim(),
         color: s.props?.color || "#2563eb",
         geo: s.props?.geo || null
       };
+      if ((s.type === "draw" || s.type === "pen") && s.props?.segments) {
+        const points = [];
+        for (const seg of s.props.segments) {
+          if (seg.path) {
+            try {
+              const decoded = b64Vecs.decodePoints(seg.path);
+              for (const p of decoded) {
+                points.push([Math.round(s.x + p.x), Math.round(s.y + p.y)]);
+              }
+            } catch (_) {
+            }
+          }
+        }
+        res.points = points;
+      } else if (s.type === "arrow" && s.props) {
+        res.startX = Math.round(s.x + (s.props.start?.x || 0));
+        res.startY = Math.round(s.y + (s.props.start?.y || 0));
+        res.endX = Math.round(s.x + (s.props.end?.x || 0));
+        res.endY = Math.round(s.y + (s.props.end?.y || 0));
+      }
+      return res;
     });
   } catch (_) {
     return [];
@@ -125233,7 +125255,7 @@ function UIBoardModal({ sessionId, onClose }) {
       refreshBoardsList();
     }
   }, [showBoardsModal, refreshBoardsList]);
-  const saveCurrentBoard = (0, import_react141.useCallback)((isManual = false) => {
+  const saveCurrentBoard = (0, import_react141.useCallback)(async (isManual = false) => {
     const editor = editorRef.current;
     if (!editor) return;
     try {
@@ -125242,6 +125264,15 @@ function UIBoardModal({ sessionId, onClose }) {
       setElementCount(elements.length);
       const bid = currentBoardId;
       const bname = currentBoardName;
+      let svg = null;
+      try {
+        const shapeIds = [...editor.getCurrentPageShapeIds()];
+        if (shapeIds.length > 0) {
+          const svgRes = await editor.getSvgString(shapeIds);
+          svg = svgRes?.svg || null;
+        }
+      } catch (_) {
+      }
       try {
         localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify(snapshot2));
         localStorage.setItem(`dsh_ui_board_name_${bid}`, bname);
@@ -125274,7 +125305,8 @@ function UIBoardModal({ sessionId, onClose }) {
           name: bname,
           session: activeSessionId,
           snapshot: snapshot2,
-          elements
+          elements,
+          svg
         })
       }).then(() => {
         if (isManual) {
@@ -125331,7 +125363,7 @@ function UIBoardModal({ sessionId, onClose }) {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         saveCurrentBoard(false);
-      }, 1e3);
+      }, 300);
     });
     return () => {
       unlisten();
