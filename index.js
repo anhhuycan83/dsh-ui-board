@@ -34,31 +34,37 @@ function listBoards() {
     for (const file of files) {
       if (file.startsWith('board-') && file.endsWith('.json')) {
         const fileId = file.slice('board-'.length, -'.json'.length);
-        const filePath = path.join(STORAGE_DIR, file);
-        try {
-          const stats = fs.statSync(filePath);
-          const raw = fs.readFileSync(filePath, 'utf-8');
-          const data = JSON.parse(raw);
-          const count = Array.isArray(data.elements) ? data.elements.length : 0;
-          let displayName = data.name;
-          if (!displayName || !displayName.trim()) {
-            if (fileId === 'default') {
-              displayName = 'Default Board';
-            } else if (fileId.startsWith('session-')) {
-              displayName = `Session ${fileId.slice('session-'.length, 'session-'.length + 8)}`;
-            } else {
-              displayName = `Board ${fileId.slice(0, 12)}`;
-            }
-          }
+        const cached = boardCache.get(fileId);
+        if (cached) {
           boards.push({
-            id: data.id || fileId,
-            name: displayName,
-            sessionId: data.sessionId || null,
-            count,
-            createdAt: data.createdAt || stats.birthtimeMs || stats.mtimeMs,
-            updatedAt: data.updatedAt || stats.mtimeMs
+            id: cached.id,
+            name: cached.name,
+            sessionId: cached.sessionId || null,
+            count: Array.isArray(cached.elements) ? cached.elements.length : 0,
+            createdAt: cached.createdAt,
+            updatedAt: cached.updatedAt
           });
-        } catch (_) {}
+        } else {
+          const filePath = path.join(STORAGE_DIR, file);
+          try {
+            const stats = fs.statSync(filePath);
+            const raw = fs.readFileSync(filePath, 'utf-8');
+            const data = JSON.parse(raw);
+            const count = Array.isArray(data.elements) ? data.elements.length : 0;
+            let displayName = data.name;
+            if (!displayName || !displayName.trim()) {
+              displayName = fileId === 'default' ? 'Default Board' : (fileId.startsWith('session-') ? `Session ${fileId.slice('session-'.length, 'session-'.length + 8)}` : `Board ${fileId.slice(0, 12)}`);
+            }
+            boards.push({
+              id: data.id || fileId,
+              name: displayName,
+              sessionId: data.sessionId || null,
+              count,
+              createdAt: data.createdAt || stats.birthtimeMs || stats.mtimeMs,
+              updatedAt: data.updatedAt || stats.mtimeMs
+            });
+          } catch (_) {}
+        }
       }
     }
   } catch (err) {
@@ -146,6 +152,9 @@ function saveBoard(arg1, arg2) {
     name: finalName,
     sessionId: sessionId || existing.sessionId || (id.startsWith('session-') ? id : null),
     elements,
+    rawElements: (arg1 && arg1.rawElements) || existing.rawElements || null,
+    appState: (arg1 && arg1.appState) || existing.appState || null,
+    files: (arg1 && arg1.files) || existing.files || null,
     snapshot: snapshot || existing.snapshot || null,
     svg: svg || existing.svg || null,
     createdAt: existing.createdAt || createdAt || Date.now(),
@@ -377,6 +386,9 @@ export function apply(ctx) {
               name: board.name,
               session: board.sessionId || sessionId,
               elements: board.elements,
+              rawElements: board.rawElements || board.elements,
+              appState: board.appState || {},
+              files: board.files || {},
               createdAt: board.createdAt,
               updatedAt: board.updatedAt
             }));
@@ -554,8 +566,16 @@ export function apply(ctx) {
         },
         async execute(args, exec) {
           const sid = args.board_id || args.session || exec.agent?.session?.id || 'default';
-          const board = loadBoard(sid);
+          let board = loadBoard(sid);
+          if ((!board.elements || board.elements.length === 0) && !args.board_id && !args.session) {
+            const list = listBoards();
+            if (list.length > 0 && list[0].count > 0) {
+              board = loadBoard(list[0].id);
+            }
+          }
+          const actualId = board.id || sid;
           let currentElements = [...board.elements];
+          let currentRawElements = Array.isArray(board.rawElements) ? [...board.rawElements] : [...currentElements];
           let currentName = board.name;
           let changeMsg = '';
 
@@ -566,11 +586,13 @@ export function apply(ctx) {
             }
           } else if (args.action === 'clear') {
             currentElements = [];
+            currentRawElements = [];
             changeMsg = 'Cleared all elements on the UI board.';
           } else if (args.action === 'delete') {
             const idsToDelete = new Set(args.element_ids || []);
             const beforeLen = currentElements.length;
             currentElements = currentElements.filter(e => !idsToDelete.has(e.id));
+            currentRawElements = currentRawElements.filter(e => !idsToDelete.has(e.id));
             changeMsg = `Deleted ${beforeLen - currentElements.length} elements from the UI board.`;
           } else if (args.action === 'add') {
             const newItems = (args.elements || []).map((item, idx) => ({
@@ -587,6 +609,50 @@ export function apply(ctx) {
               ...item
             }));
             currentElements = [...currentElements, ...newItems];
+
+            const newRawItems = newItems.map(item => {
+              if (item.type === 'text') {
+                const textStr = String(item.label || item.text || 'world');
+                return {
+                  id: item.id,
+                  type: 'text',
+                  x: Number(item.x) || 150,
+                  y: Number(item.y) || 450,
+                  width: Number(item.width) || (textStr.length * 20),
+                  height: Number(item.height) || 45,
+                  angle: 0,
+                  strokeColor: item.color || '#1e1e1e',
+                  backgroundColor: 'transparent',
+                  fillStyle: 'solid',
+                  strokeWidth: 1,
+                  strokeStyle: 'solid',
+                  roundness: null,
+                  roughness: 1,
+                  opacity: 100,
+                  groupIds: [],
+                  frameId: null,
+                  seed: Math.floor(Math.random() * 100000),
+                  version: 1,
+                  versionNonce: Math.floor(Math.random() * 100000),
+                  isDeleted: false,
+                  boundElements: null,
+                  updated: Date.now(),
+                  link: null,
+                  locked: false,
+                  text: textStr,
+                  fontSize: Number(item.fontSize) || 36,
+                  fontFamily: 1,
+                  textAlign: 'left',
+                  verticalAlign: 'top',
+                  containerId: null,
+                  originalText: textStr,
+                  lineHeight: 1.25
+                };
+              }
+              return item;
+            });
+            currentRawElements = [...currentRawElements, ...newRawItems];
+
             changeMsg = `Added ${newItems.length} elements to the UI board.`;
           } else if (args.action === 'update') {
             const updates = new Map((args.elements || []).map(e => [e.id, e]));
@@ -596,14 +662,23 @@ export function apply(ctx) {
               }
               return e;
             });
+            currentRawElements = currentRawElements.map(e => {
+              if (updates.has(e.id)) {
+                return { ...e, ...updates.get(e.id) };
+              }
+              return e;
+            });
             changeMsg = `Updated ${updates.size} elements on the UI board.`;
           }
 
           const saved = saveBoard({
-            id: sid,
+            id: actualId,
             name: currentName,
             session: args.session,
-            elements: currentElements
+            elements: currentElements,
+            rawElements: currentRawElements,
+            appState: board.appState,
+            files: board.files
           });
 
           return {

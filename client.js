@@ -231284,28 +231284,6 @@ function UIBoardModal({ sessionId, onClose }) {
     e19.target.value = "";
   }, [excalidrawAPI, showToast]);
   (0, import_react114.useEffect)(() => {
-    const handleWindowPaste = (e19) => {
-      if (!isMouseOverBoardRef.current || !excalidrawAPI) return;
-      const items = e19.clipboardData?.items;
-      if (!items) return;
-      for (let i62 = 0; i62 < items.length; i62++) {
-        const item = items[i62];
-        if (item.type && item.type.startsWith("image/")) {
-          e19.preventDefault();
-          e19.stopPropagation();
-          const file = item.getAsFile();
-          if (file) {
-            const dummyEvent = { target: { files: [file], value: "" } };
-            handleImageFileInput(dummyEvent);
-            return;
-          }
-        }
-      }
-    };
-    window.addEventListener("paste", handleWindowPaste, true);
-    return () => window.removeEventListener("paste", handleWindowPaste, true);
-  }, [excalidrawAPI, handleImageFileInput]);
-  (0, import_react114.useEffect)(() => {
     const el3 = wrapperRef.current;
     if (!el3) return;
     const handleWheel = (e19) => {
@@ -231336,6 +231314,32 @@ function UIBoardModal({ sessionId, onClose }) {
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [excalidrawAPI]);
+  (0, import_react114.useEffect)(() => {
+    const bid = currentBoardId;
+    let isChecking = false;
+    const interval = setInterval(async () => {
+      if (isChecking || isMouseOverBoardRef.current || !excalidrawAPI) return;
+      isChecking = true;
+      try {
+        const res = await fetch(`/api/ui-board?id=${encodeURIComponent(bid)}`);
+        const data6 = await res.json();
+        if (data6?.ok && data6.rawElements && Array.isArray(data6.rawElements)) {
+          const currentCount = excalidrawAPI.getSceneElements().filter((el3) => !el3.isDeleted).length;
+          const incomingCount = data6.rawElements.filter((el3) => !el3.isDeleted).length;
+          if (incomingCount !== currentCount) {
+            excalidrawAPI.updateScene({
+              elements: data6.rawElements,
+              commitToHistory: true
+            });
+            setElementCount(incomingCount);
+          }
+        }
+      } catch (_38) {
+      }
+      isChecking = false;
+    }, 2e3);
+    return () => clearInterval(interval);
+  }, [currentBoardId, excalidrawAPI]);
   const handleSendSnapshotToAi = async () => {
     if (!excalidrawAPI) return;
     try {
@@ -231543,7 +231547,17 @@ function UIBoardModal({ sessionId, onClose }) {
         h62("button", {
           className: `uib-icon-btn ${layoutMode === "maximized" ? "active" : ""}`,
           title: layoutMode === "maximized" ? "Restore Window" : "Maximize Window",
-          onClick: () => setLayoutMode((curr) => curr === "maximized" ? "side-right" : "maximized")
+          onClick: () => {
+            setLayoutMode((curr) => {
+              const next3 = curr === "maximized" ? "side-right" : "maximized";
+              setTimeout(() => {
+                if (excalidrawAPI) {
+                  excalidrawAPI.scrollToContent();
+                }
+              }, 100);
+              return next3;
+            });
+          }
         }, h62(SvgMaximize)),
         h62("button", {
           className: "uib-icon-btn",

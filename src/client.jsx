@@ -1205,31 +1205,7 @@ function UIBoardModal({ sessionId, onClose }) {
     e.target.value = '';
   }, [excalidrawAPI, showToast]);
 
-  // Window paste handler for clipboard images when mouse is over board
-  useEffect(() => {
-    const handleWindowPaste = (e) => {
-      if (!isMouseOverBoardRef.current || !excalidrawAPI) return;
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type && item.type.startsWith('image/')) {
-          e.preventDefault();
-          e.stopPropagation();
-          const file = item.getAsFile();
-          if (file) {
-            const dummyEvent = { target: { files: [file], value: '' } };
-            handleImageFileInput(dummyEvent);
-            return;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('paste', handleWindowPaste, true);
-    return () => window.removeEventListener('paste', handleWindowPaste, true);
-  }, [excalidrawAPI, handleImageFileInput]);
+  // Removed manual paste interceptor to allow native Excalidraw paste that supports Undo.
 
   // Wheel zoom prevention: prevent browser tab from zooming when mouse is over board
   useEffect(() => {
@@ -1269,6 +1245,33 @@ function UIBoardModal({ sessionId, onClose }) {
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [excalidrawAPI]);
+
+  // Live sync polling from backend to receive AI mutations
+  useEffect(() => {
+    const bid = currentBoardId;
+    let isChecking = false;
+    const interval = setInterval(async () => {
+      if (isChecking || isMouseOverBoardRef.current || !excalidrawAPI) return;
+      isChecking = true;
+      try {
+        const res = await fetch(`/api/ui-board?id=${encodeURIComponent(bid)}`);
+        const data = await res.json();
+        if (data?.ok && data.rawElements && Array.isArray(data.rawElements)) {
+          const currentCount = excalidrawAPI.getSceneElements().filter(el => !el.isDeleted).length;
+          const incomingCount = data.rawElements.filter(el => !el.isDeleted).length;
+          if (incomingCount !== currentCount) {
+            excalidrawAPI.updateScene({
+              elements: data.rawElements,
+              commitToHistory: true
+            });
+            setElementCount(incomingCount);
+          }
+        }
+      } catch (_) {}
+      isChecking = false;
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [currentBoardId, excalidrawAPI]);
 
   // Copy snapshot to clipboard and sync with AI
   const handleSendSnapshotToAi = async () => {
@@ -1486,7 +1489,17 @@ function UIBoardModal({ sessionId, onClose }) {
         h('button', {
           className: `uib-icon-btn ${layoutMode === 'maximized' ? 'active' : ''}`,
           title: layoutMode === 'maximized' ? 'Restore Window' : 'Maximize Window',
-          onClick: () => setLayoutMode(curr => curr === 'maximized' ? 'side-right' : 'maximized')
+          onClick: () => {
+            setLayoutMode(curr => {
+              const next = curr === 'maximized' ? 'side-right' : 'maximized';
+              setTimeout(() => {
+                if (excalidrawAPI) {
+                  excalidrawAPI.scrollToContent();
+                }
+              }, 100);
+              return next;
+            });
+          }
         }, h(SvgMaximize)),
         h('button', {
           className: 'uib-icon-btn',
