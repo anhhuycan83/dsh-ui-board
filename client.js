@@ -124298,7 +124298,24 @@ tldraw? probably.
 var h2 = import_react141.default.createElement;
 var STYLE_ID = "dsh-ui-board-styles";
 var TLDRAW_STYLE_ID = "tldraw-injected-styles";
+function cleanupTldrawLocalStorage() {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    const raw = localStorage.getItem("TLDRAW_USER_DATA_v3");
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && typeof data === "object") {
+        if (data.user && typeof data.user === "object" && data.user.isDarkMode !== void 0) {
+          delete data.user.isDarkMode;
+          localStorage.setItem("TLDRAW_USER_DATA_v3", JSON.stringify(data));
+        }
+      }
+    }
+  } catch (_) {
+  }
+}
 function installStyles() {
+  cleanupTldrawLocalStorage();
   if (typeof document === "undefined") return;
   if (!document.getElementById(TLDRAW_STYLE_ID)) {
     const style2 = document.createElement("style");
@@ -125040,6 +125057,7 @@ function convertLegacyElementsToSnapshot(editor, elements) {
   }
 }
 function UIBoardModal({ sessionId, onClose }) {
+  cleanupTldrawLocalStorage();
   const activeSessionId = sessionId || window.location.hash.match(/#\/s\/([^/?#]+)/)?.[1] || window.location.pathname.match(/\/s\/([^/?#]+)/)?.[1] || "default";
   const [layoutMode, setLayoutMode] = (0, import_react141.useState)("side-right");
   const [sideWidth, setSideWidth] = (0, import_react141.useState)(540);
@@ -125273,7 +125291,10 @@ function UIBoardModal({ sessionId, onClose }) {
   const handleEditorMount = (0, import_react141.useCallback)((editor) => {
     editorRef.current = editor;
     const isDark = document.body.hasAttribute("data-ds-dark-theme");
-    editor.user.updateUserPreferences({ isDarkMode: isDark });
+    try {
+      editor.user.updateUserPreferences({ colorScheme: isDark ? "dark" : "light" });
+    } catch (_) {
+    }
     const bid = currentBoardId;
     let loaded = false;
     try {
@@ -125319,7 +125340,10 @@ function UIBoardModal({ sessionId, onClose }) {
   (0, import_react141.useEffect)(() => {
     const observer = new MutationObserver(() => {
       const isDark = document.body.hasAttribute("data-ds-dark-theme");
-      editorRef.current?.user.updateUserPreferences({ isDarkMode: isDark });
+      try {
+        editorRef.current?.user.updateUserPreferences({ colorScheme: isDark ? "dark" : "light" });
+      } catch (_) {
+      }
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
     return () => observer.disconnect();
