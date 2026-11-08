@@ -1171,17 +1171,17 @@ function UIBoardModal({ sessionId, onClose }) {
 
         const editor = editorRef.current;
         if (editor) {
-          // Zoom inside tldraw around current pointer position
-          const rect = el.getBoundingClientRect();
-          const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-          const zoomMultiplier = e.deltaY < 0 ? 1.15 : 0.85;
-          const currentZoom = editor.getZoomLevel();
-          const nextZoom = Math.max(0.1, Math.min(8, currentZoom * zoomMultiplier));
-          
-          editor.setCamera({
-            x: editor.camera.x + (screenPoint.x / currentZoom - screenPoint.x / nextZoom),
-            y: editor.camera.y + (screenPoint.y / currentZoom - screenPoint.y / nextZoom),
-            z: nextZoom
+          // Dispatch normalized wheel event to Tldraw for native zoom handling
+          editor.dispatch({
+            type: 'wheel',
+            name: 'wheel',
+            delta: { x: -e.deltaX, y: -e.deltaY, z: Math.sign(e.deltaY) * 0.1 },
+            point: { x: e.clientX, y: e.clientY },
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+            ctrlKey: true,
+            metaKey: e.metaKey,
+            accelKey: true
           });
         }
       }
