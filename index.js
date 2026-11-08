@@ -20,6 +20,30 @@ function ensureStorageDir() {
 
 /** In-memory cache of boards by ID / session ID */
 const boardCache = new Map();
+const sseClients = new Set();
+
+function broadcastBoardUpdate(board) {
+  if (!board || sseClients.size === 0) return;
+  const payload = `data: ${JSON.stringify({
+    type: 'update',
+    id: board.id,
+    sessionId: board.sessionId,
+    name: board.name,
+    rawElements: board.rawElements,
+    elements: board.elements,
+    appState: board.appState,
+    files: board.files,
+    updatedAt: board.updatedAt
+  })}\n\n`;
+
+  for (const client of sseClients) {
+    try {
+      client.res.write(payload);
+    } catch (_) {
+      sseClients.delete(client);
+    }
+  }
+}
 
 function getBoardPath(id) {
   const safeId = String(id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -161,6 +185,7 @@ function saveBoard(arg1, arg2) {
     updatedAt: Date.now()
   };
   boardCache.set(id, board);
+  broadcastBoardUpdate(board);
 
   // If this board is associated with a session and id !== sessionId, update session cache & file
   if (board.sessionId && board.id !== board.sessionId) {
@@ -365,6 +390,22 @@ export function apply(ctx) {
           const action = urlObj.searchParams.get('action');
 
           if (req.method === 'GET') {
+            if (urlObj.pathname.endsWith('/stream')) {
+              res.writeHead(200, {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache, no-transform',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*'
+              });
+              const client = { res, id: urlObj.searchParams.get('id') };
+              sseClients.add(client);
+              req.on('close', () => {
+                sseClients.delete(client);
+              });
+              res.write(': connected\n\n');
+              return;
+            }
+
             if (action === 'list') {
               const boards = listBoards();
               res.statusCode = 200;

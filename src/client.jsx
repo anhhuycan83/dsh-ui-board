@@ -630,25 +630,6 @@ function UIBoardModal({ sessionId, onClose }) {
   const [toastMsg, setToastMsg] = useState('');
   const [elementCount, setElementCount] = useState(0);
 
-  // Excalidraw instance & states
-  const [excalidrawAPI, setExcalidrawAPI] = useState(null);
-  const [initialData, setInitialData] = useState(() => {
-    try {
-      const cached = localStorage.getItem(`dsh_ui_board_${activeSessionId}`);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed?.elements) {
-          return {
-            elements: parsed.elements,
-            appState: parsed.appState || {},
-            files: parsed.files || {}
-          };
-        }
-      }
-    } catch (_) {}
-    return { elements: [], appState: {}, files: {} };
-  });
-
   // Active board identity
   const [currentBoardId, setCurrentBoardId] = useState(() => {
     try {
@@ -660,12 +641,37 @@ function UIBoardModal({ sessionId, onClose }) {
 
   const [currentBoardName, setCurrentBoardName] = useState(() => {
     try {
-      return localStorage.getItem(`dsh_ui_board_name_${currentBoardId}`) ||
-        (currentBoardId === 'default' ? 'Default Board' :
-        (currentBoardId.startsWith('session-') ? 'Session Board' : 'Untitled Board'));
+      const bid = localStorage.getItem(`dsh_ui_board_current_${activeSessionId}`) || activeSessionId;
+      return localStorage.getItem(`dsh_ui_board_name_${bid}`) ||
+        (bid === 'default' ? 'Default Board' :
+        (bid.startsWith('session-') ? 'Session Board' : 'Untitled Board'));
     } catch (_) {
       return 'Untitled Board';
     }
+  });
+
+  // Excalidraw instance & states
+  const [excalidrawAPI, setExcalidrawAPI] = useState(null);
+  const [initialData, setInitialData] = useState(() => {
+    try {
+      const bid = localStorage.getItem(`dsh_ui_board_current_${activeSessionId}`) || activeSessionId;
+      let cached = localStorage.getItem(`dsh_ui_board_${bid}`);
+      if (!cached && bid !== activeSessionId) {
+        cached = localStorage.getItem(`dsh_ui_board_${activeSessionId}`);
+      }
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const raw = parsed.rawElements || parsed.elements;
+        if (Array.isArray(raw) && raw.length > 0) {
+          return {
+            elements: raw,
+            appState: parsed.appState || {},
+            files: parsed.files || {}
+          };
+        }
+      }
+    } catch (_) {}
+    return { elements: [], appState: {}, files: {} };
   });
 
   const [isEditingBoardName, setIsEditingBoardName] = useState(false);
@@ -677,6 +683,7 @@ function UIBoardModal({ sessionId, onClose }) {
   const [boardsSearch, setBoardsSearch] = useState('');
 
   // Refs
+  const isInitialLoadDoneRef = useRef(false);
   const isDraggingRef = useRef(false);
   const dragStartPosRef = useRef({ x: 0, y: 0 });
   const isResizingRef = useRef(false);
@@ -845,6 +852,7 @@ function UIBoardModal({ sessionId, onClose }) {
   // Persist current board state
   const saveCurrentBoard = useCallback(async (isManual = false) => {
     if (!excalidrawAPI) return;
+    if (!isInitialLoadDoneRef.current && !isManual) return; // Never wipe before initial mount completes!
 
     try {
       const rawElements = excalidrawAPI.getSceneElements();
@@ -920,12 +928,49 @@ function UIBoardModal({ sessionId, onClose }) {
   const handleExcalidrawChange = useCallback((elements, appState, files) => {
     const nonDeleted = elements.filter(el => !el.isDeleted);
     setElementCount(nonDeleted.length);
+    if (!isInitialLoadDoneRef.current) return;
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       saveCurrentBoard(false);
     }, 300);
   }, [saveCurrentBoard]);
+
+  // Load initial board data into Excalidraw from backend or cache
+  useEffect(() => {
+    if (!excalidrawAPI) return;
+    const bid = currentBoardId;
+    let didCancel = false;
+
+    fetch(`/api/ui-board?id=${encodeURIComponent(bid)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (didCancel) return;
+        if (data?.ok) {
+          const raw = data.rawElements || data.elements;
+          if (Array.isArray(raw) && raw.length > 0) {
+            excalidrawAPI.updateScene({
+              elements: raw,
+              appState: data.appState || {},
+              files: data.files || {},
+              commitToHistory: false
+            });
+            setElementCount(raw.filter(el => !el.isDeleted).length);
+          }
+          if (data.name) setCurrentBoardName(data.name);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!didCancel) {
+          isInitialLoadDoneRef.current = true;
+        }
+      });
+
+    return () => {
+      didCancel = true;
+    };
+  }, [excalidrawAPI, currentBoardId]);
 
   // Load a board
   const handleLoadBoard = useCallback((boardId, boardName) => {
@@ -1246,32 +1291,36 @@ function UIBoardModal({ sessionId, onClose }) {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [excalidrawAPI]);
 
-  // Live sync polling from backend to receive AI mutations
+  // Live sync via Server-Sent Events (SSE) for instant AI updates (< 20ms)
   useEffect(() => {
+    if (!excalidrawAPI) return;
     const bid = currentBoardId;
-    let isChecking = false;
-    const interval = setInterval(async () => {
-      if (isChecking || isMouseOverBoardRef.current || !excalidrawAPI) return;
-      isChecking = true;
-      try {
-        const res = await fetch(`/api/ui-board?id=${encodeURIComponent(bid)}`);
-        const data = await res.json();
-        if (data?.ok && data.rawElements && Array.isArray(data.rawElements)) {
-          const currentCount = excalidrawAPI.getSceneElements().filter(el => !el.isDeleted).length;
-          const incomingCount = data.rawElements.filter(el => !el.isDeleted).length;
-          if (incomingCount !== currentCount) {
-            excalidrawAPI.updateScene({
-              elements: data.rawElements,
-              commitToHistory: true
-            });
-            setElementCount(incomingCount);
+    let eventSource;
+    try {
+      eventSource = new EventSource(`/api/ui-board/stream?id=${encodeURIComponent(bid)}`);
+      eventSource.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data?.type === 'update' && (data.id === bid || data.sessionId === activeSessionId)) {
+            const raw = data.rawElements || data.elements;
+            if (Array.isArray(raw)) {
+              excalidrawAPI.updateScene({
+                elements: raw,
+                files: data.files || {},
+                commitToHistory: true
+              });
+              setElementCount(raw.filter(el => !el.isDeleted).length);
+              if (data.name) setCurrentBoardName(data.name);
+            }
           }
-        }
-      } catch (_) {}
-      isChecking = false;
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [currentBoardId, excalidrawAPI]);
+        } catch (_) {}
+      };
+    } catch (_) {}
+
+    return () => {
+      if (eventSource) eventSource.close();
+    };
+  }, [excalidrawAPI, currentBoardId, activeSessionId]);
 
   // Copy snapshot to clipboard and sync with AI
   const handleSendSnapshotToAi = async () => {
