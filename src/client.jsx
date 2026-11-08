@@ -906,8 +906,8 @@ function UIBoardModal({ sessionId, onClose }) {
         localStorage.setItem('dsh_ui_boards_index', JSON.stringify(idxList));
       } catch (_) {}
 
-      // Save to backend
-      fetch('/api/ui-board', {
+      // Save to backend (pass both session and id)
+      fetch(`/api/ui-board?session=${encodeURIComponent(activeSessionId)}&id=${encodeURIComponent(bid)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -936,18 +936,42 @@ function UIBoardModal({ sessionId, onClose }) {
     }, 300);
   }, [saveCurrentBoard]);
 
-  // Load initial board data into Excalidraw from backend or cache
+  // Load initial board data into Excalidraw from cache & backend
   useEffect(() => {
     if (!excalidrawAPI) return;
     const bid = currentBoardId;
     let didCancel = false;
 
-    fetch(`/api/ui-board?id=${encodeURIComponent(bid)}`)
+    // 1. First, immediately check localStorage
+    try {
+      let cached = localStorage.getItem(`dsh_ui_board_${bid}`);
+      if (!cached && bid !== activeSessionId) {
+        cached = localStorage.getItem(`dsh_ui_board_${activeSessionId}`);
+      }
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const raw = parsed.rawElements || parsed.elements;
+        if (Array.isArray(raw) && raw.length > 0) {
+          excalidrawAPI.updateScene({
+            elements: raw,
+            appState: parsed.appState || {},
+            files: parsed.files || {},
+            commitToHistory: false
+          });
+          setElementCount(raw.filter(el => !el.isDeleted).length);
+        }
+      }
+    } catch (_) {}
+
+    // 2. Then check backend (send BOTH session and id)
+    fetch(`/api/ui-board?session=${encodeURIComponent(activeSessionId)}&id=${encodeURIComponent(bid)}`)
       .then(res => res.json())
       .then(data => {
         if (didCancel) return;
         if (data?.ok) {
           const raw = data.rawElements || data.elements;
+          // IMPORTANT: Only update from server if server actually has elements!
+          // NEVER wipe client elements with an empty server response!
           if (Array.isArray(raw) && raw.length > 0) {
             excalidrawAPI.updateScene({
               elements: raw,
@@ -956,6 +980,15 @@ function UIBoardModal({ sessionId, onClose }) {
               commitToHistory: false
             });
             setElementCount(raw.filter(el => !el.isDeleted).length);
+            // Also cache into localStorage so next F5 is instant
+            try {
+              localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify({
+                elements: data.elements,
+                rawElements: raw,
+                appState: data.appState || {},
+                files: data.files || {}
+              }));
+            } catch (_) {}
           }
           if (data.name) setCurrentBoardName(data.name);
         }
@@ -970,7 +1003,7 @@ function UIBoardModal({ sessionId, onClose }) {
     return () => {
       didCancel = true;
     };
-  }, [excalidrawAPI, currentBoardId]);
+  }, [excalidrawAPI, currentBoardId, activeSessionId]);
 
   // Load a board
   const handleLoadBoard = useCallback((boardId, boardName) => {

@@ -231028,7 +231028,7 @@ function UIBoardModal({ sessionId, onClose }) {
         localStorage.setItem("dsh_ui_boards_index", JSON.stringify(idxList));
       } catch (_38) {
       }
-      fetch("/api/ui-board", {
+      fetch(`/api/ui-board?session=${encodeURIComponent(activeSessionId)}&id=${encodeURIComponent(bid)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -231057,7 +231057,27 @@ function UIBoardModal({ sessionId, onClose }) {
     if (!excalidrawAPI) return;
     const bid = currentBoardId;
     let didCancel = false;
-    fetch(`/api/ui-board?id=${encodeURIComponent(bid)}`).then((res) => res.json()).then((data6) => {
+    try {
+      let cached = localStorage.getItem(`dsh_ui_board_${bid}`);
+      if (!cached && bid !== activeSessionId) {
+        cached = localStorage.getItem(`dsh_ui_board_${activeSessionId}`);
+      }
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const raw = parsed.rawElements || parsed.elements;
+        if (Array.isArray(raw) && raw.length > 0) {
+          excalidrawAPI.updateScene({
+            elements: raw,
+            appState: parsed.appState || {},
+            files: parsed.files || {},
+            commitToHistory: false
+          });
+          setElementCount(raw.filter((el3) => !el3.isDeleted).length);
+        }
+      }
+    } catch (_38) {
+    }
+    fetch(`/api/ui-board?session=${encodeURIComponent(activeSessionId)}&id=${encodeURIComponent(bid)}`).then((res) => res.json()).then((data6) => {
       if (didCancel) return;
       if (data6?.ok) {
         const raw = data6.rawElements || data6.elements;
@@ -231069,6 +231089,15 @@ function UIBoardModal({ sessionId, onClose }) {
             commitToHistory: false
           });
           setElementCount(raw.filter((el3) => !el3.isDeleted).length);
+          try {
+            localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify({
+              elements: data6.elements,
+              rawElements: raw,
+              appState: data6.appState || {},
+              files: data6.files || {}
+            }));
+          } catch (_38) {
+          }
         }
         if (data6.name) setCurrentBoardName(data6.name);
       }
@@ -231081,7 +231110,7 @@ function UIBoardModal({ sessionId, onClose }) {
     return () => {
       didCancel = true;
     };
-  }, [excalidrawAPI, currentBoardId]);
+  }, [excalidrawAPI, currentBoardId, activeSessionId]);
   const handleLoadBoard = (0, import_react114.useCallback)((boardId, boardName) => {
     if (boardId === currentBoardId) {
       setShowBoardsModal(false);
