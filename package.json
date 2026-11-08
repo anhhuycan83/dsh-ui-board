@@ -38,6 +38,6 @@
     "esbuild": "^0.28.2"
   },
   "dependencies": {
-    "tldraw": "^5.6.0"
+    "@excalidraw/excalidraw": "0.18.1"
   }
 }

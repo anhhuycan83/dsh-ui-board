@@ -239,7 +239,7 @@ function generateHierarchySummary(elements) {
 
   const screens = elements.filter(e => e.type === 'screen' || e.type === 'frame');
   const arrows = elements.filter(e => e.type === 'arrow');
-  const penStrokes = elements.filter(e => (e.type === 'pen' || e.type === 'draw') && Array.isArray(e.points) && e.points.length > 0);
+  const penStrokes = elements.filter(e => (e.type === 'freedraw' || e.type === 'pen' || e.type === 'draw') && Array.isArray(e.points) && e.points.length > 0);
 
   let summary = `### UI Board Overview (${elements.length} elements total)\n\n`;
 
@@ -256,9 +256,10 @@ function generateHierarchySummary(elements) {
     for (const screen of screens) {
       summary += `* **[Screen] ${screen.label || 'Untitled Screen'}** (ID: \`${screen.id}\`, Pos: [${screen.x}, ${screen.y}], Size: ${screen.width}x${screen.height})\n`;
 
-      // Find children within screen bounds (exclude other screens and arrows)
+      // Find children within screen bounds or by frameId
       const children = elements.filter(e => {
         if (e.id === screen.id || e.type === 'screen' || e.type === 'frame' || e.type === 'arrow') return false;
+        if (e.frameId && e.frameId === screen.id) return true;
         return (
           e.x >= screen.x &&
           e.y >= screen.y &&
@@ -292,6 +293,7 @@ function generateHierarchySummary(elements) {
 
   const looseItems = elements.filter(e => {
     if (e.type === 'screen' || e.type === 'frame' || e.type === 'arrow') return false;
+    if (e.frameId) return false;
     // Check if inside any screen
     const insideScreen = screens.some(s => (
       e.x >= s.x && e.y >= s.y &&
@@ -304,7 +306,7 @@ function generateHierarchySummary(elements) {
   if (looseItems.length > 0) {
     summary += `#### Standalone / Outside Elements (${looseItems.length}):\n`;
     for (const item of looseItems) {
-      if (item.type === 'pen' || item.type === 'draw') {
+      if (item.type === 'freedraw' || item.type === 'pen' || item.type === 'draw') {
         const strokeLen = item.points?.length ? ` (${item.points.length} points)` : '';
         summary += `* \`PEN STROKE\`: Freehand sketch line${strokeLen} at [${item.x}, ${item.y}] (ID: \`${item.id}\`)\n`;
       } else if (item.type === 'image') {

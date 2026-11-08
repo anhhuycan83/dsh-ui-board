@@ -1,38 +1,25 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { Tldraw, getSvgAsImage, createShapeId, getPointsFromDrawSegments } from 'tldraw';
-import tldrawCss from 'tldraw/tldraw.css';
+import { Excalidraw, exportToBlob, serializeAsJSON, restoreElements } from '@excalidraw/excalidraw';
+import excalidrawCss from '@excalidraw/excalidraw/index.css';
 
 const h = React.createElement;
 
 const STYLE_ID = 'dsh-ui-board-styles';
-const TLDRAW_STYLE_ID = 'tldraw-injected-styles';
+const EXCALIDRAW_STYLE_ID = 'dsh-excalidraw-injected-styles';
 
-/** Sanitize tldraw user data in localStorage to prevent strict schema validation crashes */
-function cleanupTldrawLocalStorage() {
-  if (typeof window === 'undefined' || !window.localStorage) return;
-  try {
-    const raw = localStorage.getItem('TLDRAW_USER_DATA_v3');
-    if (raw) {
-      const data = JSON.parse(raw);
-      if (data && typeof data === 'object') {
-        if (data.user && typeof data.user === 'object' && data.user.isDarkMode !== undefined) {
-          delete data.user.isDarkMode;
-          localStorage.setItem('TLDRAW_USER_DATA_v3', JSON.stringify(data));
-        }
-      }
-    }
-  } catch (_) {}
+// Set asset path fallback if not configured
+if (typeof window !== 'undefined' && !window.EXCALIDRAW_ASSET_PATH) {
+  window.EXCALIDRAW_ASSET_PATH = 'https://esm.sh/@excalidraw/excalidraw@0.18.1/dist/prod/';
 }
 
 function installStyles() {
-  cleanupTldrawLocalStorage();
   if (typeof document === 'undefined') return;
 
-  if (!document.getElementById(TLDRAW_STYLE_ID)) {
+  if (!document.getElementById(EXCALIDRAW_STYLE_ID)) {
     const style = document.createElement('style');
-    style.id = TLDRAW_STYLE_ID;
-    style.textContent = tldrawCss;
+    style.id = EXCALIDRAW_STYLE_ID;
+    style.textContent = excalidrawCss;
     document.head.appendChild(style);
   }
 
@@ -40,7 +27,7 @@ function installStyles() {
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      /* UI Board Toolbar Button */
+      /* UI Board Toolbar Action Button */
       .uib-action-btn {
         display: inline-flex;
         align-items: center;
@@ -144,7 +131,7 @@ function installStyles() {
         user-select: none;
         cursor: grab;
         flex: none;
-        z-index: 20;
+        z-index: 30;
       }
       .uib-header:active {
         cursor: grabbing;
@@ -296,8 +283,8 @@ function installStyles() {
         transform: translateY(-1px);
       }
 
-      /* Tldraw Canvas Container */
-      .uib-tldraw-wrapper {
+      /* Excalidraw Canvas Container */
+      .uib-excalidraw-wrapper {
         position: relative;
         flex: 1;
         width: 100%;
@@ -305,7 +292,7 @@ function installStyles() {
         min-height: 0;
         overflow: hidden;
       }
-      .uib-tldraw-wrapper .tl-container {
+      .uib-excalidraw-wrapper .excalidraw {
         width: 100% !important;
         height: 100% !important;
       }
@@ -516,6 +503,7 @@ function installStyles() {
   }
 }
 
+// Vector icons
 function SvgDockRight() {
   return h('svg', { width: 14, height: 14, viewBox: '0 0 16 16', fill: 'currentColor' }, [
     h('rect', { x: 1, y: 2, width: 14, height: 12, rx: 2, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 }),
@@ -563,243 +551,73 @@ function SvgPlus() {
     h('line', { x1: 2.5, y1: 8, x2: 13.5, y2: 8 })
   ]);
 }
-
-/** Helper to extract structured element summary from Tldraw editor for AI tools */
-function extractShapesSummary(editor) {
-  if (!editor) return [];
-  try {
-    const shapes = editor.getCurrentPageShapes();
-    return shapes.map(s => {
-      let label = '';
-      if (s.props) {
-        if (typeof s.props.text === 'string') {
-          label = s.props.text;
-        } else if (typeof s.props.name === 'string') {
-          label = s.props.name;
-        } else if (typeof s.props.label === 'string') {
-          label = s.props.label;
-        } else if (s.props.richText) {
-          const extractText = (node) => {
-            if (!node) return '';
-            if (node.text) return node.text;
-            if (Array.isArray(node.content)) return node.content.map(extractText).join(' ');
-            return '';
-          };
-          label = extractText(s.props.richText);
-        }
-      }
-
-      const bounds = editor.getShapePageBounds(s);
-      const res = {
-        id: s.id,
-        type: s.type, // 'geo', 'arrow', 'text', 'note', 'frame', 'image', 'draw'
-        x: Math.round(bounds?.x ?? s.x),
-        y: Math.round(bounds?.y ?? s.y),
-        width: Math.round(bounds?.w || s.props?.w || s.props?.width || 0),
-        height: Math.round(bounds?.h || s.props?.h || s.props?.height || 0),
-        label: String(label || '').trim(),
-        color: s.props?.color || '#2563eb',
-        geo: s.props?.geo || null
-      };
-
-      if ((s.type === 'draw' || s.type === 'pen') && s.props?.segments) {
-        try {
-          const rawPts = getPointsFromDrawSegments(s.props.segments, s.props.scaleX || 1, s.props.scaleY || 1);
-          res.points = rawPts.map(p => [Math.round(s.x + p.x), Math.round(s.y + p.y)]);
-        } catch (_) {
-          res.points = [];
-        }
-      } else if (s.type === 'arrow' && s.props) {
-        res.startX = Math.round(s.x + (s.props.start?.x || 0));
-        res.startY = Math.round(s.y + (s.props.start?.y || 0));
-        res.endX = Math.round(s.x + (s.props.end?.x || 0));
-        res.endY = Math.round(s.y + (s.props.end?.y || 0));
-      }
-
-      return res;
-    });
-  } catch (_) {
-    return [];
-  }
+function SvgImage() {
+  return h('svg', { width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinejoin: 'round' }, [
+    h('rect', { x: 1.5, y: 2, width: 13, height: 12, rx: 2 }),
+    h('circle', { cx: 5.5, cy: 5.5, r: 1.5, fill: 'currentColor' }),
+    h('path', { d: 'M14.5 11l-4-4-6.5 6.5' }),
+    h('path', { d: 'M9.5 11l2-2 3 3' })
+  ]);
 }
 
-/** Convert legacy elements array into a valid Tldraw store snapshot */
-function convertLegacyElementsToSnapshot(editor, elements) {
-  if (!editor || !Array.isArray(elements) || elements.length === 0) return null;
-  try {
-    const baseSnapshot = editor.store.getStoreSnapshot();
-    const schema = baseSnapshot.schema;
-    const records = {};
+/** Extract structured element summary from Excalidraw elements for AI tools */
+function extractExcalidrawSummary(elements) {
+  if (!Array.isArray(elements) || elements.length === 0) return [];
+  const textMap = new Map();
+  elements.forEach(el => {
+    if (el.type === 'text' && el.text) {
+      textMap.set(el.id, el.text);
+    }
+  });
 
-    elements.forEach((item, idx) => {
-      const sid = createShapeId(item.id || `legacy_${idx}`);
-      const index = `a${idx + 1}`;
-
-      if (item.type === 'screen' || item.type === 'frame') {
-        records[sid] = {
-          id: sid,
-          typeName: 'shape',
-          type: 'frame',
-          x: item.x || 100,
-          y: item.y || 100,
-          rotation: 0,
-          index,
-          parentId: 'page:page',
-          isLocked: false,
-          opacity: 1,
-          meta: {},
-          props: {
-            w: item.width || 320,
-            h: item.height || 420,
-            name: item.label || 'Screen',
-            color: 'black'
-          }
-        };
-      } else if (item.type === 'text') {
-        records[sid] = {
-          id: sid,
-          typeName: 'shape',
-          type: 'text',
-          x: item.x || 100,
-          y: item.y || 100,
-          rotation: 0,
-          index,
-          parentId: 'page:page',
-          isLocked: false,
-          opacity: 1,
-          meta: {},
-          props: {
-            color: 'black',
-            size: 'm',
-            w: item.width || 120,
-            font: 'draw',
-            textAlign: 'start',
-            autoSize: true,
-            scale: 1,
-            richText: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: item.label || 'Text' }] }] }
-          }
-        };
-      } else if (item.type === 'arrow') {
-        const sx = item.startX || item.x || 100;
-        const sy = item.startY || item.y || 100;
-        const ex = item.endX || (sx + (item.width || 160));
-        const ey = item.endY || sy;
-        records[sid] = {
-          id: sid,
-          typeName: 'shape',
-          type: 'arrow',
-          x: sx,
-          y: sy,
-          rotation: 0,
-          index,
-          parentId: 'page:page',
-          isLocked: false,
-          opacity: 1,
-          meta: {},
-          props: {
-            kind: 'arc',
-            elbowMidPoint: 0.5,
-            dash: 'draw',
-            size: 'm',
-            fill: 'none',
-            color: 'blue',
-            labelColor: 'black',
-            bend: 0,
-            start: { x: 0, y: 0 },
-            end: { x: ex - sx, y: ey - sy },
-            arrowheadStart: 'none',
-            arrowheadEnd: 'arrow',
-            richText: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: item.label || '' }] }] },
-            labelPosition: 0.5,
-            font: 'draw',
-            scale: 1
-          }
-        };
-      } else if (item.type === 'pen' || item.type === 'draw') {
-        const pts = item.points || [[0, 0], [10, 10]];
-        const minX = Math.min(...pts.map(p => p[0]));
-        const minY = Math.min(...pts.map(p => p[1]));
-        const pathStr = pts.map((p, i) => (i === 0 ? 'M' : 'L') + (p[0] - minX) + ',' + (p[1] - minY)).join(' ');
-        records[sid] = {
-          id: sid,
-          typeName: 'shape',
-          type: 'draw',
-          x: minX,
-          y: minY,
-          rotation: 0,
-          index,
-          parentId: 'page:page',
-          isLocked: false,
-          opacity: 1,
-          meta: {},
-          props: {
-            segments: [{ type: 'free', path: pathStr }],
-            color: 'blue',
-            fill: 'none',
-            dash: 'draw',
-            size: 'm',
-            isComplete: true,
-            isClosed: false,
-            isPen: false,
-            scale: 1,
-            scaleX: 1,
-            scaleY: 1
-          }
-        };
-      } else {
-        records[sid] = {
-          id: sid,
-          typeName: 'shape',
-          type: 'geo',
-          x: item.x || 100,
-          y: item.y || 100,
-          rotation: 0,
-          index,
-          parentId: 'page:page',
-          isLocked: false,
-          opacity: 1,
-          meta: {},
-          props: {
-            w: item.width || 140,
-            h: item.height || 40,
-            geo: 'rectangle',
-            dash: 'draw',
-            growY: 0,
-            url: '',
-            scale: 1,
-            flipX: false,
-            flipY: false,
-            color: item.type === 'button' ? 'blue' : 'black',
-            labelColor: 'black',
-            fill: item.type === 'button' ? 'semi' : 'none',
-            size: 'm',
-            font: 'draw',
-            align: 'middle',
-            verticalAlign: 'middle',
-            richText: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: item.label || '' }] }] }
-          }
-        };
+  return elements.filter(el => !el.isDeleted).map(el => {
+    let label = '';
+    if (el.type === 'text') {
+      label = el.text || '';
+    } else if (el.type === 'frame') {
+      label = el.name || '';
+    } else if (el.boundElements) {
+      // Find text bound to container
+      for (const b of el.boundElements) {
+        if (b.type === 'text' && textMap.has(b.id)) {
+          label = textMap.get(b.id);
+          break;
+        }
       }
-    });
+    }
 
-    return {
-      store: {
-        ...baseSnapshot.store,
-        ...records
-      },
-      schema
+    const res = {
+      id: el.id,
+      type: el.type,
+      x: Math.round(el.x),
+      y: Math.round(el.y),
+      width: Math.round(el.width),
+      height: Math.round(el.height),
+      label: String(label || '').trim(),
+      color: el.strokeColor || '#2563eb',
+      fill: el.backgroundColor || 'transparent',
+      frameId: el.frameId || null
     };
-  } catch (err) {
-    console.error('Failed to convert legacy elements:', err);
-    return null;
-  }
+
+    if (el.type === 'freedraw' && Array.isArray(el.points)) {
+      res.points = el.points.map(p => [Math.round(el.x + p[0]), Math.round(el.y + p[1])]);
+    } else if (el.type === 'arrow' && Array.isArray(el.points) && el.points.length >= 2) {
+      const pStart = el.points[0];
+      const pEnd = el.points[el.points.length - 1];
+      res.startX = Math.round(el.x + pStart[0]);
+      res.startY = Math.round(el.y + pStart[1]);
+      res.endX = Math.round(el.x + pEnd[0]);
+      res.endY = Math.round(el.y + pEnd[1]);
+    }
+
+    return res;
+  });
 }
 
 /**
- * Main UI Board Modal Component with Tldraw
+ * Main UI Board Modal Component with Excalidraw
  */
 function UIBoardModal({ sessionId, onClose }) {
-  cleanupTldrawLocalStorage();
   const activeSessionId = sessionId ||
     (window.location.hash.match(/#\/s\/([^/?#]+)/)?.[1]) ||
     (window.location.pathname.match(/\/s\/([^/?#]+)/)?.[1]) ||
@@ -811,6 +629,25 @@ function UIBoardModal({ sessionId, onClose }) {
   const [size, setSize] = useState({ w: 820, h: 580 });
   const [toastMsg, setToastMsg] = useState('');
   const [elementCount, setElementCount] = useState(0);
+
+  // Excalidraw instance & states
+  const [excalidrawAPI, setExcalidrawAPI] = useState(null);
+  const [initialData, setInitialData] = useState(() => {
+    try {
+      const cached = localStorage.getItem(`dsh_ui_board_${activeSessionId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.elements) {
+          return {
+            elements: parsed.elements,
+            appState: parsed.appState || {},
+            files: parsed.files || {}
+          };
+        }
+      }
+    } catch (_) {}
+    return { elements: [], appState: {}, files: {} };
+  });
 
   // Active board identity
   const [currentBoardId, setCurrentBoardId] = useState(() => {
@@ -838,19 +675,19 @@ function UIBoardModal({ sessionId, onClose }) {
   const [showBoardsModal, setShowBoardsModal] = useState(false);
   const [savedBoards, setSavedBoards] = useState([]);
   const [boardsSearch, setBoardsSearch] = useState('');
-  const boardImportInputRef = useRef(null);
 
   // Refs
-  const editorRef = useRef(null);
   const isDraggingRef = useRef(false);
   const dragStartPosRef = useRef({ x: 0, y: 0 });
   const isResizingRef = useRef(false);
   const resizeStartRef = useRef({ w: 0, h: 0, x: 0, y: 0 });
   const windowRef = useRef(null);
+  const wrapperRef = useRef(null);
   const isMouseOverBoardRef = useRef(false);
-  const tldrawWrapperRef = useRef(null);
   const toastTimerRef = useRef(null);
   const saveTimeoutRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const boardImportInputRef = useRef(null);
 
   const showToast = useCallback((msg) => {
     setToastMsg(msg);
@@ -1007,31 +844,40 @@ function UIBoardModal({ sessionId, onClose }) {
 
   // Persist current board state
   const saveCurrentBoard = useCallback(async (isManual = false) => {
-    const editor = editorRef.current;
-    if (!editor) return;
+    if (!excalidrawAPI) return;
 
     try {
-      const snapshot = editor.store.getStoreSnapshot();
-      const elements = extractShapesSummary(editor);
-      setElementCount(elements.length);
+      const rawElements = excalidrawAPI.getSceneElements();
+      const appState = excalidrawAPI.getAppState();
+      const files = excalidrawAPI.getFiles();
+
+      const summaryElements = extractExcalidrawSummary(rawElements);
+      setElementCount(summaryElements.length);
 
       const bid = currentBoardId;
       const bname = currentBoardName;
 
-      // Extract live SVG
-      let svg = null;
-      try {
-        const shapeIds = [...editor.getCurrentPageShapeIds()];
-        if (shapeIds.length > 0) {
-          const svgRes = await editor.getSvgString(shapeIds);
-          svg = svgRes?.svg || null;
-        }
-      } catch (_) {}
+      const payload = {
+        id: bid,
+        name: bname,
+        session: activeSessionId,
+        elements: summaryElements,
+        rawElements,
+        appState: {
+          viewBackgroundColor: appState.viewBackgroundColor,
+          zoom: appState.zoom,
+          scrollX: appState.scrollX,
+          scrollY: appState.scrollY,
+          theme: appState.theme
+        },
+        files
+      };
 
       // Save to localStorage
       try {
-        localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify(snapshot));
+        localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify(payload));
         localStorage.setItem(`dsh_ui_board_name_${bid}`, bname);
+
         let idxList = [];
         try {
           idxList = JSON.parse(localStorage.getItem('dsh_ui_boards_index') || '[]');
@@ -1041,7 +887,7 @@ function UIBoardModal({ sessionId, onClose }) {
           id: bid,
           name: bname,
           sessionId: activeSessionId,
-          count: elements.length,
+          count: summaryElements.length,
           updatedAt: Date.now()
         };
         if (existIdx >= 0) {
@@ -1056,14 +902,7 @@ function UIBoardModal({ sessionId, onClose }) {
       fetch('/api/ui-board', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: bid,
-          name: bname,
-          session: activeSessionId,
-          snapshot,
-          elements,
-          svg
-        })
+        body: JSON.stringify(payload)
       }).then(() => {
         if (isManual) {
           refreshBoardsList();
@@ -1075,148 +914,18 @@ function UIBoardModal({ sessionId, onClose }) {
     } catch (err) {
       console.error('Error saving board:', err);
     }
-  }, [currentBoardId, currentBoardName, activeSessionId, refreshBoardsList, showToast]);
+  }, [excalidrawAPI, currentBoardId, currentBoardName, activeSessionId, refreshBoardsList, showToast]);
 
-  // Handle board mount in Tldraw
-  const handleEditorMount = useCallback((editor) => {
-    editorRef.current = editor;
+  // Excalidraw onChange callback
+  const handleExcalidrawChange = useCallback((elements, appState, files) => {
+    const nonDeleted = elements.filter(el => !el.isDeleted);
+    setElementCount(nonDeleted.length);
 
-    // 1. Chặn phím tắt zoom của trình duyệt khi đang thao tác trên Board
-    const handleKeyDown = (e) => {
-      // Only intercept if mouse is inside the board or board is focused
-      if (!isMouseOverBoardRef.current && !windowRef.current?.contains(document.activeElement)) {
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.key === '+' || e.key === '=') editor.zoomIn();
-        if (e.key === '-') editor.zoomOut();
-        if (e.key === '0') editor.resetZoom();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown, true);
-
-    // Synchronize initial dark theme
-    const isDark = document.body.hasAttribute('data-ds-dark-theme');
-    try {
-      editor.user.updateUserPreferences({ colorScheme: isDark ? 'dark' : 'light' });
-    } catch (_) {}
-
-    // Load initial board data
-    const bid = currentBoardId;
-    let loaded = false;
-
-    // Check localStorage cache first
-    try {
-      const cached = localStorage.getItem(`dsh_ui_board_${bid}`);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed?.store && parsed?.schema) {
-          editor.store.loadStoreSnapshot(parsed);
-          setElementCount(editor.getCurrentPageShapes().length);
-          loaded = true;
-        }
-      }
-    } catch (_) {}
-
-    // Fetch from backend
-    fetch(`/api/ui-board?id=${encodeURIComponent(bid)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data?.ok) {
-          if (data.snapshot?.store && data.snapshot?.schema) {
-            editor.store.loadStoreSnapshot(data.snapshot);
-            setElementCount(editor.getCurrentPageShapes().length);
-          } else if (!loaded && Array.isArray(data.elements) && data.elements.length > 0) {
-            // Restore legacy elements into a valid snapshot safely
-            const converted = convertLegacyElementsToSnapshot(editor, data.elements);
-            if (converted) {
-              editor.store.loadStoreSnapshot(converted);
-              setElementCount(editor.getCurrentPageShapes().length);
-            }
-          }
-          if (data.name) setCurrentBoardName(data.name);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load board from server:', err);
-      });
-
-    // Listen to changes with debounced auto-save (300ms for live-view sync)
-    const unlisten = editor.store.listen(() => {
-      setElementCount(editor.getCurrentPageShapes().length);
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => {
-        saveCurrentBoard(false);
-      }, 300);
-    });
-
-    return () => {
-      unlisten();
-      window.removeEventListener('keydown', handleKeyDown, true);
-    };
-  }, [currentBoardId, saveCurrentBoard]);
-
-  // Intercept Ctrl+Wheel zoom directly on the board element with passive: false
-  useEffect(() => {
-    const el = tldrawWrapperRef.current;
-    if (!el) return;
-
-    const handleWheel = (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        // Prevent browser tab from zooming
-        e.preventDefault();
-        e.stopPropagation();
-
-        const editor = editorRef.current;
-        if (editor) {
-          // Dispatch normalized wheel event to Tldraw for native zoom handling
-          editor.dispatch({
-            type: 'wheel',
-            name: 'wheel',
-            delta: { x: -e.deltaX, y: -e.deltaY, z: Math.sign(e.deltaY) * 0.1 },
-            point: { x: e.clientX, y: e.clientY },
-            shiftKey: e.shiftKey,
-            altKey: e.altKey,
-            ctrlKey: true,
-            metaKey: e.metaKey,
-            accelKey: true
-          });
-        }
-      }
-    };
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      el.removeEventListener('wheel', handleWheel);
-    };
-  }, []);
-
-  // Dark theme observer
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      const isDark = document.body.hasAttribute('data-ds-dark-theme');
-      try {
-        editorRef.current?.user.updateUserPreferences({ colorScheme: isDark ? 'dark' : 'light' });
-      } catch (_) {}
-    });
-    observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] });
-    return () => observer.disconnect();
-  }, []);
-
-  // Rename current board
-  const handleSaveBoardName = () => {
-    setIsEditingBoardName(false);
-    const trimmed = (boardNameEdit || '').trim();
-    if (!trimmed || trimmed === currentBoardName) return;
-    setCurrentBoardName(trimmed);
-    try {
-      localStorage.setItem(`dsh_ui_board_name_${currentBoardId}`, trimmed);
-    } catch (_) {}
-    saveCurrentBoard(false);
-    showToast(`🏷️ Renamed board to "${trimmed}"`);
-  };
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveCurrentBoard(false);
+    }, 300);
+  }, [saveCurrentBoard]);
 
   // Load a board
   const handleLoadBoard = useCallback((boardId, boardName) => {
@@ -1236,43 +945,42 @@ function UIBoardModal({ sessionId, onClose }) {
       localStorage.setItem(`dsh_ui_board_name_${boardId}`, finalName);
     } catch (_) {}
 
-    // Load into Tldraw editor
-    const editor = editorRef.current;
-    if (editor) {
-      fetch(`/api/ui-board?id=${encodeURIComponent(boardId)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data?.ok && data.snapshot?.store && data.snapshot?.schema) {
-            editor.store.loadStoreSnapshot(data.snapshot);
-            setElementCount(editor.getCurrentPageShapes().length);
-            if (data.name) setCurrentBoardName(data.name);
-          } else if (data?.ok && Array.isArray(data.elements) && data.elements.length > 0) {
-            const converted = convertLegacyElementsToSnapshot(editor, data.elements);
-            if (converted) {
-              editor.store.loadStoreSnapshot(converted);
-              setElementCount(editor.getCurrentPageShapes().length);
-            }
-            if (data.name) setCurrentBoardName(data.name);
-          } else {
-            // Check local cache
-            try {
-              const cached = localStorage.getItem(`dsh_ui_board_${boardId}`);
-              if (cached) {
-                const parsed = JSON.parse(cached);
-                if (parsed?.store && parsed?.schema) {
-                  editor.store.loadStoreSnapshot(parsed);
-                  setElementCount(editor.getCurrentPageShapes().length);
-                }
-              }
-            } catch (_) {}
+    // Fetch and load into Excalidraw
+    fetch(`/api/ui-board?id=${encodeURIComponent(boardId)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data?.ok && excalidrawAPI) {
+          const raw = data.rawElements || data.elements || [];
+          excalidrawAPI.updateScene({
+            elements: raw,
+            appState: data.appState || {},
+            files: data.files || {},
+            commitToHistory: true
+          });
+          if (data.name) setCurrentBoardName(data.name);
+          excalidrawAPI.scrollToContent();
+        }
+      })
+      .catch(() => {
+        // Fallback to local storage
+        try {
+          const cached = localStorage.getItem(`dsh_ui_board_${boardId}`);
+          if (cached && excalidrawAPI) {
+            const parsed = JSON.parse(cached);
+            excalidrawAPI.updateScene({
+              elements: parsed.rawElements || parsed.elements || [],
+              appState: parsed.appState || {},
+              files: parsed.files || {},
+              commitToHistory: true
+            });
+            excalidrawAPI.scrollToContent();
           }
-        })
-        .catch(() => {});
-    }
+        } catch (_) {}
+      });
 
     setShowBoardsModal(false);
     showToast(`📂 Opened board "${finalName}"!`);
-  }, [currentBoardId, activeSessionId, saveCurrentBoard, showToast]);
+  }, [currentBoardId, activeSessionId, saveCurrentBoard, excalidrawAPI, showToast]);
 
   // Create new board
   const handleCreateNewBoard = useCallback(() => {
@@ -1292,31 +1000,15 @@ function UIBoardModal({ sessionId, onClose }) {
       localStorage.setItem(`dsh_ui_board_current_${activeSessionId}`, newId);
     } catch (_) {}
 
-    const editor = editorRef.current;
-    if (editor) {
-      editor.selectAll();
-      editor.deleteShapes(editor.getSelectedShapeIds());
+    if (excalidrawAPI) {
+      excalidrawAPI.resetScene();
       setElementCount(0);
-      const emptySnapshot = editor.store.getStoreSnapshot();
-      try {
-        localStorage.setItem(`dsh_ui_board_${newId}`, JSON.stringify(emptySnapshot));
-      } catch (_) {}
-      fetch('/api/ui-board', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: newId,
-          name: trimmed,
-          session: activeSessionId,
-          snapshot: emptySnapshot,
-          elements: []
-        })
-      }).then(() => refreshBoardsList());
+      saveCurrentBoard(false);
     }
 
     setShowBoardsModal(false);
     showToast(`✨ Created new board "${trimmed}"!`);
-  }, [activeSessionId, saveCurrentBoard, refreshBoardsList, showToast]);
+  }, [activeSessionId, saveCurrentBoard, excalidrawAPI, showToast]);
 
   // Delete a board
   const handleDeleteBoard = useCallback((boardId, boardName, e) => {
@@ -1351,49 +1043,46 @@ function UIBoardModal({ sessionId, onClose }) {
       const fallbackName = 'Untitled Board';
       setCurrentBoardId(fallbackId);
       setCurrentBoardName(fallbackName);
-      editorRef.current?.selectAll();
-      editorRef.current?.deleteShapes(editorRef.current?.getSelectedShapeIds());
+      if (excalidrawAPI) excalidrawAPI.resetScene();
       setElementCount(0);
     }
 
     refreshBoardsList();
     showToast(`🗑️ Deleted board "${boardName || boardId}"`);
-  }, [currentBoardId, activeSessionId, refreshBoardsList, showToast]);
+  }, [currentBoardId, activeSessionId, refreshBoardsList, excalidrawAPI, showToast]);
 
   // Export board to file
   const handleExportBoardById = useCallback((boardId, boardName, e) => {
     if (e) e.stopPropagation();
-    let boardSnapshot = null;
-    let boardElements = [];
-
-    if (boardId === currentBoardId && editorRef.current) {
-      boardSnapshot = editorRef.current.store.getStoreSnapshot();
-      boardElements = extractShapesSummary(editorRef.current);
+    let payload = null;
+    if (boardId === currentBoardId && excalidrawAPI) {
+      payload = {
+        id: boardId,
+        name: boardName || 'ui-board',
+        elements: excalidrawAPI.getSceneElements(),
+        appState: excalidrawAPI.getAppState(),
+        files: excalidrawAPI.getFiles(),
+        exportedAt: Date.now()
+      };
     } else {
       try {
         const cached = localStorage.getItem(`dsh_ui_board_${boardId}`);
-        if (cached) boardSnapshot = JSON.parse(cached);
+        if (cached) payload = JSON.parse(cached);
       } catch (_) {}
     }
 
-    const data = {
-      id: boardId,
-      name: boardName || 'ui-board',
-      snapshot: boardSnapshot,
-      elements: boardElements,
-      exportedAt: Date.now()
-    };
-    const jsonStr = JSON.stringify(data, null, 2);
+    if (!payload) return;
+    const jsonStr = JSON.stringify(payload, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const URLObj = window.URL || window.webkitURL || window;
     const blobUrl = URLObj.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;
-    a.download = `${(boardName || 'ui-board').replace(/[^a-zA-Z0-9_-]/g, '_')}.uiboard.json`;
+    a.download = `${(boardName || 'ui-board').replace(/[^a-zA-Z0-9_-]/g, '_')}.excalidraw.json`;
     a.click();
     URLObj.revokeObjectURL(blobUrl);
     showToast(`💾 Exported "${boardName || 'board'}" to file!`);
-  }, [currentBoardId, showToast]);
+  }, [currentBoardId, excalidrawAPI, showToast]);
 
   // Import board from file
   const handleImportBoardFile = useCallback((file) => {
@@ -1410,25 +1099,15 @@ function UIBoardModal({ sessionId, onClose }) {
         setCurrentBoardId(newId);
         setCurrentBoardName(newName);
 
-        const editor = editorRef.current;
-        if (editor) {
-          if (data.snapshot?.store) {
-            editor.store.loadStoreSnapshot(data.snapshot);
-            setElementCount(editor.getCurrentPageShapes().length);
-          } else if (Array.isArray(data.elements)) {
-            editor.selectAll();
-            editor.deleteShapes(editor.getSelectedShapeIds());
-            const newShapes = data.elements.map(item => {
-              const sid = createShapeId(item.id);
-              if (item.type === 'screen' || item.type === 'frame') {
-                return { id: sid, type: 'frame', x: item.x || 100, y: item.y || 100, props: { w: item.width || 320, h: item.height || 460, name: item.label || 'Screen' } };
-              }
-              return { id: sid, type: 'geo', x: item.x || 120, y: item.y || 120, props: { w: item.width || 140, h: item.height || 40, geo: 'rectangle', text: item.label || 'Component', color: 'blue' } };
-            });
-            editor.createShapes(newShapes);
-            setElementCount(newShapes.length);
-          }
-
+        if (excalidrawAPI) {
+          const raw = data.rawElements || data.elements || [];
+          excalidrawAPI.updateScene({
+            elements: raw,
+            appState: data.appState || {},
+            files: data.files || {},
+            commitToHistory: true
+          });
+          excalidrawAPI.scrollToContent();
           saveCurrentBoard(false);
         }
 
@@ -1440,30 +1119,181 @@ function UIBoardModal({ sessionId, onClose }) {
       }
     };
     reader.readAsText(file);
-  }, [saveCurrentBoard, refreshBoardsList, showToast]);
+  }, [saveCurrentBoard, refreshBoardsList, excalidrawAPI, showToast]);
+
+  // Insert image file from computer
+  const handleImageFileInput = useCallback((e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !excalidrawAPI) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file.type.startsWith('image/')) continue;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataURL = reader.result;
+        const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        const img = new Image();
+        img.onload = () => {
+          const appState = excalidrawAPI.getAppState();
+          const currentElements = excalidrawAPI.getSceneElements();
+
+          let w = img.naturalWidth || 300;
+          let h = img.naturalHeight || 200;
+          const maxDim = 420;
+          if (w > maxDim || h > maxDim) {
+            const ratio = Math.min(maxDim / w, maxDim / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+          }
+
+          const centerX = -appState.scrollX + (appState.width / 2) / (appState.zoom?.value || 1);
+          const centerY = -appState.scrollY + (appState.height / 2) / (appState.zoom?.value || 1);
+
+          const imageElement = {
+            id: 'elem_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+            type: 'image',
+            x: Math.round(centerX - w / 2),
+            y: Math.round(centerY - h / 2),
+            width: w,
+            height: h,
+            angle: 0,
+            strokeColor: 'transparent',
+            backgroundColor: 'transparent',
+            fillStyle: 'solid',
+            strokeWidth: 1,
+            strokeStyle: 'solid',
+            roundness: null,
+            roughness: 0,
+            opacity: 100,
+            groupIds: [],
+            frameId: null,
+            seed: Math.floor(Math.random() * 100000),
+            version: 1,
+            versionNonce: Math.floor(Math.random() * 100000),
+            isDeleted: false,
+            boundElements: null,
+            updated: Date.now(),
+            link: null,
+            locked: false,
+            status: 'saved',
+            fileId: fileId,
+            scale: [1, 1]
+          };
+
+          excalidrawAPI.addFiles([
+            {
+              id: fileId,
+              dataURL: dataURL,
+              mimeType: file.type,
+              created: Date.now()
+            }
+          ]);
+
+          excalidrawAPI.updateScene({
+            elements: [...currentElements, imageElement],
+            commitToHistory: true
+          });
+
+          showToast(`✅ Added image "${file.name}" to board!`);
+        };
+        img.src = dataURL;
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
+  }, [excalidrawAPI, showToast]);
+
+  // Window paste handler for clipboard images when mouse is over board
+  useEffect(() => {
+    const handleWindowPaste = (e) => {
+      if (!isMouseOverBoardRef.current || !excalidrawAPI) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type && item.type.startsWith('image/')) {
+          e.preventDefault();
+          e.stopPropagation();
+          const file = item.getAsFile();
+          if (file) {
+            const dummyEvent = { target: { files: [file], value: '' } };
+            handleImageFileInput(dummyEvent);
+            return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleWindowPaste, true);
+    return () => window.removeEventListener('paste', handleWindowPaste, true);
+  }, [excalidrawAPI, handleImageFileInput]);
+
+  // Wheel zoom prevention: prevent browser tab from zooming when mouse is over board
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    const handleWheel = (e) => {
+      if ((e.ctrlKey || e.metaKey) && isMouseOverBoardRef.current) {
+        // Prevent browser tab zooming; Excalidraw handles zoom internally
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  // Keyboard zoom shortcuts isolation: Ctrl + +/-/0 only zoom canvas when over board
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!isMouseOverBoardRef.current || !excalidrawAPI) return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const appState = excalidrawAPI.getAppState();
+        const curZoom = appState.zoom?.value || 1;
+        if (e.key === '+' || e.key === '=') {
+          excalidrawAPI.updateScene({ appState: { zoom: { value: Math.min(30, Number((curZoom * 1.2).toFixed(2))) } } });
+        } else if (e.key === '-') {
+          excalidrawAPI.updateScene({ appState: { zoom: { value: Math.max(0.1, Number((curZoom / 1.2).toFixed(2))) } } });
+        } else if (e.key === '0') {
+          excalidrawAPI.updateScene({ appState: { zoom: { value: 1 } } });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [excalidrawAPI]);
 
   // Copy snapshot to clipboard and sync with AI
   const handleSendSnapshotToAi = async () => {
-    const editor = editorRef.current;
-    if (!editor) return;
+    if (!excalidrawAPI) return;
 
     try {
-      const shapeIds = [...editor.getCurrentPageShapeIds()];
-      if (shapeIds.length === 0) {
+      const elements = excalidrawAPI.getSceneElements();
+      if (!elements || elements.length === 0) {
         showToast('⚠️ The board is currently empty. Draw something first!');
         return;
       }
+      const appState = excalidrawAPI.getAppState();
+      const files = excalidrawAPI.getFiles();
+      const isDark = document.body.hasAttribute('data-ds-dark-theme');
 
-      const svgResult = await editor.getSvgString(shapeIds);
-      if (!svgResult || !svgResult.svg) {
-        showToast('⚠️ Could not generate board SVG image.');
-        return;
-      }
-
-      const blob = await getSvgAsImage(svgResult.svg, {
-        type: 'png',
-        quality: 1,
-        scale: 2
+      const blob = await exportToBlob({
+        elements,
+        appState: {
+          ...appState,
+          exportBackground: true,
+          viewBackgroundColor: isDark ? '#121212' : '#ffffff'
+        },
+        files,
+        mimeType: 'image/png',
+        quality: 1
       });
 
       if (blob && navigator.clipboard && navigator.clipboard.write) {
@@ -1472,14 +1302,26 @@ function UIBoardModal({ sessionId, onClose }) {
         ]);
         showToast('✅ Board snapshot copied to clipboard! Press Ctrl+V in chat to discuss with AI.');
       } else {
-        showToast('✅ Snapshot prepared!');
+        showToast('✅ Snapshot ready!');
       }
 
-      // Sync latest snapshot & element hierarchy to backend for AI tools
       saveCurrentBoard(false);
     } catch (err) {
       showToast(`Snapshot error: ${err.message}`);
     }
+  };
+
+  // Rename current board
+  const handleSaveBoardName = () => {
+    setIsEditingBoardName(false);
+    const trimmed = (boardNameEdit || '').trim();
+    if (!trimmed || trimmed === currentBoardName) return;
+    setCurrentBoardName(trimmed);
+    try {
+      localStorage.setItem(`dsh_ui_board_name_${currentBoardId}`, trimmed);
+    } catch (_) {}
+    saveCurrentBoard(false);
+    showToast(`🏷️ Renamed board to "${trimmed}"`);
   };
 
   // Window layout positioning
@@ -1526,13 +1368,16 @@ function UIBoardModal({ sessionId, onClose }) {
   }
 
   const isSideMode = layoutMode === 'side-right' || layoutMode === 'side-left';
+  const isDark = typeof document !== 'undefined' && document.body.hasAttribute('data-ds-dark-theme');
 
   return h('div', {
     ref: windowRef,
     className: `uib-window ${isSideMode ? 'side-mode' : ''}`,
     style: windowStyle,
     onMouseEnter: () => { isMouseOverBoardRef.current = true; },
-    onMouseLeave: () => { isMouseOverBoardRef.current = false; }
+    onMouseLeave: () => { isMouseOverBoardRef.current = false; },
+    onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); },
+    onDrop: (e) => { e.stopPropagation(); }
   }, [
     // Side resizer bar
     layoutMode === 'side-right' ? h('div', {
@@ -1576,7 +1421,7 @@ function UIBoardModal({ sessionId, onClose }) {
             h('span', { className: 'uib-board-title-text' }, currentBoardName),
             h('span', { style: { fontSize: '11px', opacity: 0.6 } }, '✏️')
           ]),
-        h('span', { className: 'uib-action-badge' }, `${elementCount} ${elementCount === 1 ? 'shape' : 'shapes'}`)
+        h('span', { className: 'uib-action-badge' }, `${elementCount} ${elementCount === 1 ? 'element' : 'elements'}`)
       ]),
 
       h('div', { className: 'uib-header-controls' }, [
@@ -1592,15 +1437,24 @@ function UIBoardModal({ sessionId, onClose }) {
         // Manual Save button
         h('button', {
           className: 'uib-icon-btn',
-          title: 'Save current board snapshot',
+          title: 'Save current board',
           onClick: () => saveCurrentBoard(true)
         }, h(SvgSave)),
         // New Board button
         h('button', {
           className: 'uib-icon-btn',
-          title: 'Create a new board',
+          title: 'Create new board',
           onClick: handleCreateNewBoard
         }, h(SvgPlus)),
+        // Insert Image button
+        h('button', {
+          className: 'uib-btn-secondary',
+          title: 'Insert image from computer',
+          onClick: () => fileInputRef.current?.click()
+        }, [
+          h(SvgImage),
+          h('span', null, 'Image')
+        ]),
 
         h('div', { className: 'uib-tool-sep' }),
 
@@ -1642,15 +1496,23 @@ function UIBoardModal({ sessionId, onClose }) {
       ])
     ]),
 
-    // Tldraw Canvas Container
+    // Excalidraw Canvas Container
     h('div', {
-      ref: tldrawWrapperRef,
-      className: 'uib-tldraw-wrapper'
+      ref: wrapperRef,
+      className: 'uib-excalidraw-wrapper'
     }, [
-      h(Tldraw, {
-        autoFocus: true,
-        inferDarkMode: true,
-        onMount: handleEditorMount
+      h(Excalidraw, {
+        excalidrawAPI: (api) => setExcalidrawAPI(api),
+        initialData: initialData,
+        onChange: handleExcalidrawChange,
+        theme: isDark ? 'dark' : 'light',
+        UIOptions: {
+          canvasActions: {
+            loadScene: false,
+            saveToActiveFile: false,
+            export: false
+          }
+        }
       })
     ]),
 
@@ -1728,7 +1590,7 @@ function UIBoardModal({ sessionId, onClose }) {
                     isActive ? h('span', { className: 'uib-active-pill' }, 'Active') : null
                   ]),
                   h('div', { className: 'uib-board-card-meta' }, [
-                    h('span', null, `${b.count || 0} ${b.count === 1 ? 'shape' : 'shapes'}`),
+                    h('span', null, `${b.count || 0} ${b.count === 1 ? 'element' : 'elements'}`),
                     h('span', null, '•'),
                     h('span', null, formatTimeAgo(b.updatedAt))
                   ])
@@ -1760,11 +1622,21 @@ function UIBoardModal({ sessionId, onClose }) {
       ])
     ]) : null,
 
+    // Hidden input for image file insertion
+    h('input', {
+      ref: fileInputRef,
+      type: 'file',
+      accept: 'image/*',
+      multiple: true,
+      style: { display: 'none' },
+      onChange: handleImageFileInput
+    }),
+
     // Hidden input for board JSON import
     h('input', {
       ref: boardImportInputRef,
       type: 'file',
-      accept: '.json,.uiboard.json',
+      accept: '.json,.excalidraw.json',
       style: { display: 'none' },
       onChange: (e) => {
         const file = e.target.files?.[0];
@@ -1793,7 +1665,7 @@ function UIBoardHeaderAction({ sessionId }) {
         e.currentTarget.blur();
         setIsOpen(curr => !curr);
       },
-      title: 'Open UI Wireframe Board to sketch and collaborate with AI'
+      title: 'Open Excalidraw UI Wireframe Board to sketch and collaborate with AI'
     }, [
       h('span', { key: 'icon', style: { fontSize: '14px' } }, '🎨'),
       h('span', { key: 'text' }, 'UI Board')
