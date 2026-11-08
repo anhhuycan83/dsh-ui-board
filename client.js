@@ -125392,7 +125392,11 @@ function UIBoardModal({ sessionId, onClose }) {
           const zoomMultiplier = e.deltaY < 0 ? 1.15 : 0.85;
           const currentZoom = editor.getZoomLevel();
           const nextZoom = Math.max(0.1, Math.min(8, currentZoom * zoomMultiplier));
-          editor.zoomToBounds(editor.getViewportPageBounds(), { targetZoom: nextZoom });
+          editor.setCamera({
+            x: editor.camera.x + (screenPoint.x / currentZoom - screenPoint.x / nextZoom),
+            y: editor.camera.y + (screenPoint.y / currentZoom - screenPoint.y / nextZoom),
+            z: nextZoom
+          });
         }
       }
     };
