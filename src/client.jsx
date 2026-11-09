@@ -1029,6 +1029,8 @@ function UIBoardModal({ sessionId, onClose }) {
       .then(data => {
         if (data?.ok && excalidrawAPI) {
           const raw = data.rawElements || data.elements || [];
+          // IMPORTANT: Only clear if data specifically says it's empty, 
+          // or just update existing scene to avoid flicker-and-wipe
           excalidrawAPI.updateScene({
             elements: raw,
             appState: data.appState || {},
@@ -1039,22 +1041,7 @@ function UIBoardModal({ sessionId, onClose }) {
           excalidrawAPI.scrollToContent();
         }
       })
-      .catch(() => {
-        // Fallback to local storage
-        try {
-          const cached = localStorage.getItem(`dsh_ui_board_${boardId}`);
-          if (cached && excalidrawAPI) {
-            const parsed = JSON.parse(cached);
-            excalidrawAPI.updateScene({
-              elements: parsed.rawElements || parsed.elements || [],
-              appState: parsed.appState || {},
-              files: parsed.files || {},
-              commitToHistory: true
-            });
-            excalidrawAPI.scrollToContent();
-          }
-        } catch (_) {}
-      });
+      .catch(() => {});
 
     setShowBoardsModal(false);
     showToast(`📂 Opened board "${finalName}"!`);

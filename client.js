@@ -231138,20 +231138,6 @@ function UIBoardModal({ sessionId, onClose }) {
         excalidrawAPI.scrollToContent();
       }
     }).catch(() => {
-      try {
-        const cached = localStorage.getItem(`dsh_ui_board_${boardId}`);
-        if (cached && excalidrawAPI) {
-          const parsed = JSON.parse(cached);
-          excalidrawAPI.updateScene({
-            elements: parsed.rawElements || parsed.elements || [],
-            appState: parsed.appState || {},
-            files: parsed.files || {},
-            commitToHistory: true
-          });
-          excalidrawAPI.scrollToContent();
-        }
-      } catch (_38) {
-      }
     });
     setShowBoardsModal(false);
     showToast(`\u{1F4C2} Opened board "${finalName}"!`);
