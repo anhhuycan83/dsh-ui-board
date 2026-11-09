@@ -230990,7 +230990,8 @@ function UIBoardModal({ sessionId, onClose }) {
       setElementCount(summaryElements.length);
       const bid = currentBoardId;
       const bname = overrideName && overrideName.trim() || currentBoardName;
-      if (!isManual && rawElements.length === 0 && elementCount > 0) {
+      const activeElements = rawElements.filter((el3) => !el3.isDeleted);
+      if (!isManual && activeElements.length === 0) {
         return;
       }
       const payload = {
@@ -230999,6 +231000,7 @@ function UIBoardModal({ sessionId, onClose }) {
         session: activeSessionId,
         elements: summaryElements,
         rawElements,
+        isManual: Boolean(isManual),
         clientId: windowClientIdRef.current,
         appState: {
           viewBackgroundColor: appState.viewBackgroundColor,
@@ -231390,17 +231392,35 @@ function UIBoardModal({ sessionId, onClose }) {
       eventSource.onmessage = (e19) => {
         try {
           const data6 = JSON.parse(e19.data);
+          if (data6?.senderClientId && data6.senderClientId === windowClientIdRef.current) {
+            return;
+          }
           if (data6?.type === "update" && (data6.id === bid || data6.sessionId === activeSessionId)) {
             const raw = data6.rawElements || data6.elements;
-            if (Array.isArray(raw)) {
+            if (Array.isArray(raw) && raw.length > 0) {
               const restored = Mp(raw);
               excalidrawAPI.updateScene({
                 elements: restored,
                 files: data6.files || {},
-                commitToHistory: true
+                commitToHistory: false
               });
               setElementCount(restored.filter((el3) => !el3.isDeleted).length);
               if (data6.name) setCurrentBoardName(data6.name);
+              try {
+                localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify({
+                  id: bid,
+                  name: data6.name || currentBoardName,
+                  session: activeSessionId,
+                  elements: data6.elements || extractExcalidrawSummary(restored),
+                  rawElements: restored,
+                  appState: data6.appState || {},
+                  files: data6.files || {}
+                }));
+                if (data6.name) {
+                  localStorage.setItem(`dsh_ui_board_name_${bid}`, data6.name);
+                }
+              } catch (_38) {
+              }
             }
           }
         } catch (_38) {
@@ -231447,16 +231467,16 @@ function UIBoardModal({ sessionId, onClose }) {
       showToast(`Snapshot error: ${err2.message}`);
     }
   };
-  const handleSaveBoardName = () => {
+  const handleSaveBoardName = (nameToSave) => {
     setIsEditingBoardName(false);
-    const trimmed = (boardNameEdit || "").trim();
+    const trimmed = (nameToSave || boardNameEdit || "").trim();
     if (!trimmed || trimmed === currentBoardName) return;
     setCurrentBoardName(trimmed);
     try {
       localStorage.setItem(`dsh_ui_board_name_${currentBoardId}`, trimmed);
     } catch (_38) {
     }
-    saveCurrentBoard(false);
+    saveCurrentBoard(true, trimmed);
     showToast(`\u{1F3F7}\uFE0F Renamed board to "${trimmed}"`);
   };
   let windowStyle = {
@@ -231543,9 +231563,9 @@ function UIBoardModal({ sessionId, onClose }) {
           value: boardNameEdit,
           autoFocus: true,
           onChange: (e19) => setBoardNameEdit(e19.target.value),
-          onBlur: handleSaveBoardName,
+          onBlur: () => handleSaveBoardName(boardNameEdit),
           onKeyDown: (e19) => {
-            if (e19.key === "Enter") handleSaveBoardName();
+            if (e19.key === "Enter") handleSaveBoardName(boardNameEdit);
             if (e19.key === "Escape") setIsEditingBoardName(false);
           }
         }) : h62("div", {

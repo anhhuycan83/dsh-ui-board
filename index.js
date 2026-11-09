@@ -22,7 +22,7 @@ function ensureStorageDir() {
 const boardCache = new Map();
 const sseClients = new Set();
 
-function broadcastBoardUpdate(board) {
+function broadcastBoardUpdate(board, senderClientId = null) {
   if (!board || sseClients.size === 0) return;
   const payload = `data: ${JSON.stringify({
     type: 'update',
@@ -33,7 +33,8 @@ function broadcastBoardUpdate(board) {
     elements: board.elements,
     appState: board.appState,
     files: board.files,
-    updatedAt: board.updatedAt
+    updatedAt: board.updatedAt,
+    senderClientId: senderClientId || board.clientId || null
   })}\n\n`;
 
   for (const client of sseClients) {
@@ -166,6 +167,13 @@ function saveBoard(arg1, arg2) {
   }
 
   const existing = boardCache.get(id) || {};
+  const isExplicitManual = Boolean(arg1 && (arg1.isManual || arg1.action === 'clear' || arg1.action === 'delete'));
+  // SAFETY: If not manual, and incoming elements are empty, but existing board has content, DO NOT wipe!
+  if (!isExplicitManual && elements.length === 0 && existing.elements && existing.elements.length > 0) {
+    console.warn(`[dsh-ui-board] Prevented wiping board ${id} with empty auto-save payload`);
+    return existing;
+  }
+
   let finalName = (name && name.trim()) || existing.name;
   if (!finalName) {
     if (id === 'default') {
@@ -191,7 +199,7 @@ function saveBoard(arg1, arg2) {
     updatedAt: Date.now()
   };
   boardCache.set(id, board);
-  broadcastBoardUpdate(board);
+  broadcastBoardUpdate(board, arg1 && arg1.clientId);
 
   // If this board is associated with a session and id !== sessionId, update session cache & file
   if (board.sessionId && board.id !== board.sessionId) {
