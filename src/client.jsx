@@ -664,7 +664,7 @@ function UIBoardModal({ sessionId, onClose }) {
         const raw = parsed.rawElements || parsed.elements;
         if (Array.isArray(raw) && raw.length > 0) {
           return {
-            elements: raw,
+            elements: restoreElements(raw),
             appState: parsed.appState || {},
             files: parsed.files || {}
           };
@@ -683,6 +683,7 @@ function UIBoardModal({ sessionId, onClose }) {
   const [boardsSearch, setBoardsSearch] = useState('');
 
   // Refs
+  const windowClientIdRef = useRef('client_' + Math.random().toString(36).slice(2));
   const isInitialLoadDoneRef = useRef(false);
   const isDraggingRef = useRef(false);
   const dragStartPosRef = useRef({ x: 0, y: 0 });
@@ -850,7 +851,7 @@ function UIBoardModal({ sessionId, onClose }) {
   }, [showBoardsModal, refreshBoardsList]);
 
   // Persist current board state
-  const saveCurrentBoard = useCallback(async (isManual = false) => {
+  const saveCurrentBoard = useCallback(async (isManual = false, overrideName = null) => {
     if (!excalidrawAPI) return;
     if (!isInitialLoadDoneRef.current && !isManual) return; // Never wipe before initial mount completes!
 
@@ -863,7 +864,12 @@ function UIBoardModal({ sessionId, onClose }) {
       setElementCount(summaryElements.length);
 
       const bid = currentBoardId;
-      const bname = currentBoardName;
+      const bname = (overrideName && overrideName.trim()) || currentBoardName;
+
+      // GUARD: Never auto-save an empty array over an existing board during transition!
+      if (!isManual && rawElements.length === 0 && elementCount > 0) {
+        return;
+      }
 
       const payload = {
         id: bid,
@@ -871,6 +877,7 @@ function UIBoardModal({ sessionId, onClose }) {
         session: activeSessionId,
         elements: summaryElements,
         rawElements,
+        clientId: windowClientIdRef.current,
         appState: {
           viewBackgroundColor: appState.viewBackgroundColor,
           zoom: appState.zoom,
@@ -922,7 +929,7 @@ function UIBoardModal({ sessionId, onClose }) {
     } catch (err) {
       console.error('Error saving board:', err);
     }
-  }, [excalidrawAPI, currentBoardId, currentBoardName, activeSessionId, refreshBoardsList, showToast]);
+  }, [excalidrawAPI, currentBoardId, currentBoardName, activeSessionId, elementCount, refreshBoardsList, showToast]);
 
   // Excalidraw onChange callback
   const handleExcalidrawChange = useCallback((elements, appState, files) => {
@@ -952,13 +959,14 @@ function UIBoardModal({ sessionId, onClose }) {
         const parsed = JSON.parse(cached);
         const raw = parsed.rawElements || parsed.elements;
         if (Array.isArray(raw) && raw.length > 0) {
+          const restored = restoreElements(raw);
           excalidrawAPI.updateScene({
-            elements: raw,
+            elements: restored,
             appState: parsed.appState || {},
             files: parsed.files || {},
             commitToHistory: false
           });
-          setElementCount(raw.filter(el => !el.isDeleted).length);
+          setElementCount(restored.filter(el => !el.isDeleted).length);
         }
       }
     } catch (_) {}
@@ -973,13 +981,14 @@ function UIBoardModal({ sessionId, onClose }) {
           // IMPORTANT: Only update from server if server actually has elements!
           // NEVER wipe client elements with an empty server response!
           if (Array.isArray(raw) && raw.length > 0) {
+            const restored = restoreElements(raw);
             excalidrawAPI.updateScene({
-              elements: raw,
+              elements: restored,
               appState: data.appState || {},
               files: data.files || {},
               commitToHistory: false
             });
-            setElementCount(raw.filter(el => !el.isDeleted).length);
+            setElementCount(restored.filter(el => !el.isDeleted).length);
             // Also cache into localStorage so next F5 is instant
             try {
               localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify({
@@ -1029,14 +1038,19 @@ function UIBoardModal({ sessionId, onClose }) {
       .then(data => {
         if (data?.ok && excalidrawAPI) {
           const raw = data.rawElements || data.elements || [];
-          // IMPORTANT: Only clear if data specifically says it's empty, 
-          // or just update existing scene to avoid flicker-and-wipe
-          excalidrawAPI.updateScene({
-            elements: raw,
-            appState: data.appState || {},
-            files: data.files || {},
-            commitToHistory: true
-          });
+          if (Array.isArray(raw) && raw.length > 0) {
+            const restored = restoreElements(raw);
+            excalidrawAPI.updateScene({
+              elements: restored,
+              appState: data.appState || {},
+              files: data.files || {},
+              commitToHistory: true
+            });
+            setElementCount(restored.filter(el => !el.isDeleted).length);
+          } else {
+            excalidrawAPI.resetScene();
+            setElementCount(0);
+          }
           if (data.name) setCurrentBoardName(data.name);
           excalidrawAPI.scrollToContent();
         }
@@ -1324,12 +1338,13 @@ function UIBoardModal({ sessionId, onClose }) {
           if (data?.type === 'update' && (data.id === bid || data.sessionId === activeSessionId)) {
             const raw = data.rawElements || data.elements;
             if (Array.isArray(raw)) {
+              const restored = restoreElements(raw);
               excalidrawAPI.updateScene({
-                elements: raw,
+                elements: restored,
                 files: data.files || {},
                 commitToHistory: true
               });
-              setElementCount(raw.filter(el => !el.isDeleted).length);
+              setElementCount(restored.filter(el => !el.isDeleted).length);
               if (data.name) setCurrentBoardName(data.name);
             }
           }

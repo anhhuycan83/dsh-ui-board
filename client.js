@@ -230811,7 +230811,7 @@ function UIBoardModal({ sessionId, onClose }) {
         const raw = parsed.rawElements || parsed.elements;
         if (Array.isArray(raw) && raw.length > 0) {
           return {
-            elements: raw,
+            elements: Mp(raw),
             appState: parsed.appState || {},
             files: parsed.files || {}
           };
@@ -230826,6 +230826,7 @@ function UIBoardModal({ sessionId, onClose }) {
   const [showBoardsModal, setShowBoardsModal] = (0, import_react114.useState)(false);
   const [savedBoards, setSavedBoards] = (0, import_react114.useState)([]);
   const [boardsSearch, setBoardsSearch] = (0, import_react114.useState)("");
+  const windowClientIdRef = (0, import_react114.useRef)("client_" + Math.random().toString(36).slice(2));
   const isInitialLoadDoneRef = (0, import_react114.useRef)(false);
   const isDraggingRef = (0, import_react114.useRef)(false);
   const dragStartPosRef = (0, import_react114.useRef)({ x: 0, y: 0 });
@@ -230978,7 +230979,7 @@ function UIBoardModal({ sessionId, onClose }) {
       refreshBoardsList();
     }
   }, [showBoardsModal, refreshBoardsList]);
-  const saveCurrentBoard = (0, import_react114.useCallback)(async (isManual = false) => {
+  const saveCurrentBoard = (0, import_react114.useCallback)(async (isManual = false, overrideName = null) => {
     if (!excalidrawAPI) return;
     if (!isInitialLoadDoneRef.current && !isManual) return;
     try {
@@ -230988,13 +230989,17 @@ function UIBoardModal({ sessionId, onClose }) {
       const summaryElements = extractExcalidrawSummary(rawElements);
       setElementCount(summaryElements.length);
       const bid = currentBoardId;
-      const bname = currentBoardName;
+      const bname = overrideName && overrideName.trim() || currentBoardName;
+      if (!isManual && rawElements.length === 0 && elementCount > 0) {
+        return;
+      }
       const payload = {
         id: bid,
         name: bname,
         session: activeSessionId,
         elements: summaryElements,
         rawElements,
+        clientId: windowClientIdRef.current,
         appState: {
           viewBackgroundColor: appState.viewBackgroundColor,
           zoom: appState.zoom,
@@ -231043,7 +231048,7 @@ function UIBoardModal({ sessionId, onClose }) {
     } catch (err2) {
       console.error("Error saving board:", err2);
     }
-  }, [excalidrawAPI, currentBoardId, currentBoardName, activeSessionId, refreshBoardsList, showToast]);
+  }, [excalidrawAPI, currentBoardId, currentBoardName, activeSessionId, elementCount, refreshBoardsList, showToast]);
   const handleExcalidrawChange = (0, import_react114.useCallback)((elements2, appState, files) => {
     const nonDeleted = elements2.filter((el3) => !el3.isDeleted);
     setElementCount(nonDeleted.length);
@@ -231066,13 +231071,14 @@ function UIBoardModal({ sessionId, onClose }) {
         const parsed = JSON.parse(cached);
         const raw = parsed.rawElements || parsed.elements;
         if (Array.isArray(raw) && raw.length > 0) {
+          const restored = Mp(raw);
           excalidrawAPI.updateScene({
-            elements: raw,
+            elements: restored,
             appState: parsed.appState || {},
             files: parsed.files || {},
             commitToHistory: false
           });
-          setElementCount(raw.filter((el3) => !el3.isDeleted).length);
+          setElementCount(restored.filter((el3) => !el3.isDeleted).length);
         }
       }
     } catch (_38) {
@@ -231082,13 +231088,14 @@ function UIBoardModal({ sessionId, onClose }) {
       if (data6?.ok) {
         const raw = data6.rawElements || data6.elements;
         if (Array.isArray(raw) && raw.length > 0) {
+          const restored = Mp(raw);
           excalidrawAPI.updateScene({
-            elements: raw,
+            elements: restored,
             appState: data6.appState || {},
             files: data6.files || {},
             commitToHistory: false
           });
-          setElementCount(raw.filter((el3) => !el3.isDeleted).length);
+          setElementCount(restored.filter((el3) => !el3.isDeleted).length);
           try {
             localStorage.setItem(`dsh_ui_board_${bid}`, JSON.stringify({
               elements: data6.elements,
@@ -231128,12 +231135,19 @@ function UIBoardModal({ sessionId, onClose }) {
     fetch(`/api/ui-board?id=${encodeURIComponent(boardId)}`).then((res) => res.json()).then((data6) => {
       if (data6?.ok && excalidrawAPI) {
         const raw = data6.rawElements || data6.elements || [];
-        excalidrawAPI.updateScene({
-          elements: raw,
-          appState: data6.appState || {},
-          files: data6.files || {},
-          commitToHistory: true
-        });
+        if (Array.isArray(raw) && raw.length > 0) {
+          const restored = Mp(raw);
+          excalidrawAPI.updateScene({
+            elements: restored,
+            appState: data6.appState || {},
+            files: data6.files || {},
+            commitToHistory: true
+          });
+          setElementCount(restored.filter((el3) => !el3.isDeleted).length);
+        } else {
+          excalidrawAPI.resetScene();
+          setElementCount(0);
+        }
         if (data6.name) setCurrentBoardName(data6.name);
         excalidrawAPI.scrollToContent();
       }
@@ -231379,12 +231393,13 @@ function UIBoardModal({ sessionId, onClose }) {
           if (data6?.type === "update" && (data6.id === bid || data6.sessionId === activeSessionId)) {
             const raw = data6.rawElements || data6.elements;
             if (Array.isArray(raw)) {
+              const restored = Mp(raw);
               excalidrawAPI.updateScene({
-                elements: raw,
+                elements: restored,
                 files: data6.files || {},
                 commitToHistory: true
               });
-              setElementCount(raw.filter((el3) => !el3.isDeleted).length);
+              setElementCount(restored.filter((el3) => !el3.isDeleted).length);
               if (data6.name) setCurrentBoardName(data6.name);
             }
           }
